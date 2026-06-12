@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,9 +19,23 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
+      - name: Attest plugin artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          body: |
+            Initial release of O-Tie.
+
+            - Interactive risk bowtie diagram editor
+            - Barriers, escalation factors, and analysis stacks
+            - PNG export, undo/redo, help modal
+            - Auto-save to .bowtie JSON files
           files: |
             main.js
             manifest.json
