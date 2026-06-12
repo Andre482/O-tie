@@ -1,0 +1,67 @@
+{
+  "id": "example-steamcracker",
+  "name": "Defective Steamcracker",
+  "hazard": "High pressure ethylene cracking system",
+  "topEvent": "Loss of containment in steamcracker furnace",
+  "threats": [
+    {
+      "id": "threat-1",
+      "label": "Tube corrosion / fatigue",
+      "preventionBarriers": [
+        {
+          "id": "pb-1",
+          "label": "Periodic tube inspection program",
+          "escalationFactors": []
+        },
+        {
+          "id": "pb-2",
+          "label": "Material selection standards",
+          "escalationFactors": []
+        }
+      ]
+    },
+    {
+      "id": "threat-2",
+      "label": "Operator error during startup",
+      "preventionBarriers": [
+        {
+          "id": "pb-3",
+          "label": "Standard operating procedures",
+          "escalationFactors": []
+        }
+      ]
+    }
+  ],
+  "consequences": [
+    {
+      "id": "consequence-1",
+      "label": "Fire / explosion",
+      "mitigationBarriers": [
+        {
+          "id": "mb-1",
+          "label": "Deluge and fire suppression systems",
+          "escalationFactors": []
+        }
+      ]
+    },
+    {
+      "id": "consequence-2",
+      "label": "Toxic gas release",
+      "mitigationBarriers": [
+        {
+          "id": "mb-2",
+          "label": "Gas detection and isolation",
+          "escalationFactors": []
+        },
+        {
+          "id": "mb-3",
+          "label": "Emergency response plan",
+          "escalationFactors": []
+        }
+      ]
+    }
+  ],
+  "view": { "zoom": 1, "panX": 0, "panY": 0 },
+  "createdAt": "2026-06-09T00:00:00.000Z",
+  "updatedAt": "2026-06-09T00:00:00.000Z"
+}

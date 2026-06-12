@@ -1,0 +1,474 @@
+{
+  "id": "cl-contigo-me-hydraulic-pipe-failure",
+  "name": "CL Contigo - ME Hydraulic Pipe Failure",
+  "hazard": "High-pressure Main Engine hydraulic oil system (HPS & HCU piping inside the cam case) of the MAN B&W 5S50ME-B9.3 TII",
+  "topEvent": "Loss of containment of Main Engine hydraulic oil (failure/leakage of HPS & HCU pipes and securing arrangements in the cam case)",
+  "threats": [
+    {
+      "id": "threat-1",
+      "label": "Excessive 2nd-order vibration (RoT Compensator non-operational for a prolonged period)",
+      "notes": "5-cylinder MAN B&W 5S50ME-B9.3 TII is highly sensitive to 2nd-order vibration. RoT Compensator in steering gear room was found not working; axial compensator and two top bracings were operational but insufficient alone.",
+      "preventionBarriers": [
+        {
+          "id": "pb-1-1",
+          "label": "RoT Compensator / vibration damper operational",
+          "notes": "RoT Compensator was non-operational for a prolonged period. PMS recorded inspection on 23/02/2026 but did not note non-operational status. Equipment was not flagged as critical in PMS.",
+          "escalationFactors": [
+            {
+              "id": "ef-1-1-1",
+              "label": "RoT Compensator not flagged critical in PMS; no specific alarm / no HMI log",
+              "notes": "Alarm system only indicates common alarm at ME Operating Panel. HMI has no log functionality to review when system stopped.",
+              "escalationBarriers": [
+                {
+                  "id": "eb-1-1-1",
+                  "label": "Restore RoT Compensator; update PMS criticality and alarm/HMI",
+                  "notes": "Preventive measure (Open, target 01-Jun-2026): restore RoT Compensator, verify during ME running, record in PMS. Restored to operational condition by 04/06/2026.",
+                  "escalationFactors": [],
+                  "stack": [
+                    {
+                      "id": "stack-eb-1-1-1-eff",
+                      "field": "effectiveness",
+                      "label": "Fair",
+                      "color": "#f1c40f"
+                    }
+                  ],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-1-1-eff",
+              "field": "effectiveness",
+              "label": "Failed",
+              "color": "#c0392b"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "pb-1-2",
+          "label": "Axial compensator + two top bracings",
+          "notes": "Axial compensator and two port-side top bracings confirmed operational during investigation, but alone could not compensate for non-operational RoT Compensator.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-pb-1-2-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "pb-1-3",
+          "label": "PMS inspection of vibration-control equipment (4,000 hr)",
+          "notes": "Inspection job existed at 4,000-hour interval but failed to identify non-operational RoT Compensator.",
+          "escalationFactors": [
+            {
+              "id": "ef-1-3-1",
+              "label": "Repeated PSC findings with weak shore follow-up",
+              "notes": "Previous PSC findings and repeated technical deficiencies indicated pattern of weak follow-up and ineffective improvement of maintenance standards.",
+              "escalationBarriers": [
+                {
+                  "id": "eb-1-3-1",
+                  "label": "Shore management intervention and maker superintendent follow-up",
+                  "notes": "Preventive measure (Open, target 15-Jun-2026): maker superintendent inspection covering vibration control, cam-case piping and PMS compliance.",
+                  "escalationFactors": [],
+                  "stack": [
+                    {
+                      "id": "stack-eb-1-3-1-eff",
+                      "field": "effectiveness",
+                      "label": "Fair",
+                      "color": "#f1c40f"
+                    }
+                  ],
+                  "stackCollapsed": true
+                }
+              ]
+            },
+            {
+              "id": "ef-1-3-2",
+              "label": "VM inspections in port with ME not running",
+              "notes": "Three VM inspections since last dry dock (Apr 2025) could not detect RoT Comp issue because ME was not running and vibration-control equipment was not operational.",
+              "escalationBarriers": [
+                {
+                  "id": "eb-1-3-2",
+                  "label": "VM inspection scope includes ME-running vibration-control verification",
+                  "notes": "Investigator note: quality of VM inspection for the period should be reviewed.",
+                  "escalationFactors": [],
+                  "stack": [
+                    {
+                      "id": "stack-eb-1-3-2-eff",
+                      "field": "effectiveness",
+                      "label": "Fair",
+                      "color": "#f1c40f"
+                    }
+                  ],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-1-3-eff",
+              "field": "effectiveness",
+              "label": "Fair",
+              "color": "#f1c40f"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "threat-2",
+      "label": "Low HPS nitrogen accumulator pressure (~40 bar vs 136 bar maker spec)",
+      "notes": "HPS nitrogen accumulator found with low pressure (~40 bar vs 136 bar maker requirement). Low accumulator pressure increases hydraulic pressure pulsations and contributed to pipe failure per Everllence.",
+      "preventionBarriers": [
+        {
+          "id": "pb-2-1",
+          "label": "Accumulator charge maintained per maker specification",
+          "notes": "Accumulator pre-charge was not maintained at maker-required level. Confirmed by manufacturer as contributing factor.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-pb-2-1-eff",
+              "field": "effectiveness",
+              "label": "Failed",
+              "color": "#c0392b"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "pb-2-2",
+          "label": "Periodic accumulator pressure check and recharge",
+          "notes": "No effective trending or monthly verification of HPS/HCU nitrogen accumulator pre-charge pressure in PMS prior to incident.",
+          "escalationFactors": [
+            {
+              "id": "ef-2-2-1",
+              "label": "No PMS trending of HPS/HCU N2 accumulator pre-charge pressure",
+              "notes": "Maker requires pre-charge per specification with temperature correction where applicable.",
+              "escalationBarriers": [
+                {
+                  "id": "eb-2-2-1",
+                  "label": "Monthly accumulator pre-charge check, trending and VM verification",
+                  "notes": "Preventive measure (Open, target 01-Jun-2026): record results in PMS and send to VM for monthly verification.",
+                  "escalationFactors": [],
+                  "stack": [
+                    {
+                      "id": "stack-eb-2-2-1-eff",
+                      "field": "effectiveness",
+                      "label": "Fair",
+                      "color": "#f1c40f"
+                    }
+                  ],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-2-2-eff",
+              "field": "effectiveness",
+              "label": "Fair",
+              "color": "#f1c40f"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "threat-3",
+      "label": "Progressive deterioration / loosening of pipe supports and brackets",
+      "notes": "Increased vibration caused bolts of support brackets to loosen, further increasing vibration levels in hydraulic pipes until failure. Everllence identified vibration as main cause of pipe failures.",
+      "preventionBarriers": [
+        {
+          "id": "pb-3-1",
+          "label": "Cam-case inspection incl. pipe supports/brackets (PMS revised monthly)",
+          "notes": "Pre-incident 2,000-hour scope did not include torque verification of supports/brackets. PMS revised post-incident to monthly inspection with maker torque values (Closed 15-Apr-2026).",
+          "escalationFactors": [
+            {
+              "id": "ef-3-1-1",
+              "label": "Continuity weakness of ship/shore teams (manning, crew turnover)",
+              "notes": "No stable back-to-back crew arrangement; varying backgrounds reduced vessel-specific knowledge and ability to identify recurring defects.",
+              "escalationBarriers": [
+                {
+                  "id": "eb-3-1-1",
+                  "label": "Senior-officer screening and crew-continuity management",
+                  "notes": "Fleet-wide manning review for technically sensitive vessels recommended.",
+                  "escalationFactors": [],
+                  "stack": [
+                    {
+                      "id": "stack-eb-3-1-1-eff",
+                      "field": "effectiveness",
+                      "label": "Fair",
+                      "color": "#f1c40f"
+                    }
+                  ],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-3-1-eff",
+              "field": "effectiveness",
+              "label": "Fair",
+              "color": "#f1c40f"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "pb-3-2",
+          "label": "Correct torque tightening of securing bolts (torque spanner)",
+          "notes": "Chief Engineer failed to ensure proper technical control during repairs. Torque values not applied; hand spanners used instead of torque spanners, leading to inadequately secured connections.",
+          "escalationFactors": [
+            {
+              "id": "ef-3-2-1",
+              "label": "Chief Engineer supervision / technical-control deficiency",
+              "notes": "CE had history of poor performance feedback. Concerns regarding supervision, quality of repairs, and control of pipe installation during incident.",
+              "escalationBarriers": [
+                {
+                  "id": "eb-3-2-1",
+                  "label": "Technical supervision capability and CE appraisal follow-up",
+                  "notes": "Lessons learned: crew competence and supervision directly impact technical reliability.",
+                  "escalationFactors": [],
+                  "stack": [
+                    {
+                      "id": "stack-eb-3-2-1-eff",
+                      "field": "effectiveness",
+                      "label": "Fair",
+                      "color": "#f1c40f"
+                    }
+                  ],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-3-2-eff",
+              "field": "effectiveness",
+              "label": "Failed",
+              "color": "#c0392b"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "pb-3-3",
+          "label": "Robust securing arrangements and material standards",
+          "notes": "Lock washers appeared installed on support bracket per manufacturer picture, but progressive deterioration of supports, brackets, retaining rings and securing arrangements continued.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-pb-3-3-eff",
+              "field": "effectiveness",
+              "label": "Poor",
+              "color": "#e67e22"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    }
+  ],
+  "consequences": [
+    {
+      "id": "consequence-1",
+      "label": "Loss of propulsion and vessel drifting ~245 NM off the Brazilian coast (grounding/collision risk)",
+      "notes": "At 04:00 on 18/03/2026, vessel lost propulsion while drifting ~245 NM off Brazil. Calm weather and distance from land reduced immediate grounding/collision risk.",
+      "mitigationBarriers": [
+        {
+          "id": "mb-1-1",
+          "label": "AMS low-hydraulic-pressure alarm detection and engine-room crew response",
+          "notes": "Low hydraulic pressure alarms triggered repeated ME shutdowns. Crew responded to alarms and attempted repairs.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-1-1-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-1-2",
+          "label": "Temporary onboard repairs to restore short-term propulsion",
+          "notes": "Situational violation: crew used welding, fabricated collars and improvised gaskets due to loss of propulsion pressure and no genuine spares. Repairs failed under operating pressure and vibration.",
+          "escalationFactors": [
+            {
+              "id": "ef-mb-1-2-1",
+              "label": "No genuine spares on board (pipes, brackets, retaining rings, sealing parts not on critical spares list)",
+              "notes": "Investigation: spare pipes not required on maker/SMS minimum list, but operational risk justified carrying critical spares.",
+              "escalationBarriers": [
+                {
+                  "id": "eb-mb-1-2-1",
+                  "label": "Review and update critical spare-parts list (MAN ME/ME-B)",
+                  "notes": "Fleet-wide review of hydraulic pipes, supports and sealing hardware for MAN ME/ME-B engines.",
+                  "escalationFactors": [],
+                  "stack": [
+                    {
+                      "id": "stack-eb-mb-1-2-1-eff",
+                      "field": "effectiveness",
+                      "label": "Fair",
+                      "color": "#f1c40f"
+                    }
+                  ],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-mb-1-2-eff",
+              "field": "effectiveness",
+              "label": "Poor",
+              "color": "#e67e22"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-1-3",
+          "label": "ERT activation + shore/maker technical support (Everllence, Hitachi-MAN)",
+          "notes": "ERT activated at 04:30. Everllence and Hitachi-MAN service engineers attended. Shore management and technical department provided remote support.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-1-3-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-1-4",
+          "label": "Position/drift-rate monitoring, calm weather, distance from land",
+          "notes": "Investigation confirmed weather conditions did not contribute to incident. Good visibility, moderate sea state, vessel rolling but no precipitation.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-1-4-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "consequence-2",
+      "label": "Repeated Main Engine shutdowns / prolonged unreliable propulsion",
+      "notes": "Hydraulic oil leakages caused low-pressure alarms, repeated ME shutdowns, and eventual total loss of propulsion on 18/03/2026.",
+      "mitigationBarriers": [
+        {
+          "id": "mb-2-1",
+          "label": "Operate on single HPS pump at reduced RPM and lowered pressure set point",
+          "notes": "Crew attempted to manage system by operating on single HPS pump with reduced RPM and lowered pressure set point. Temporary measure only.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-2-1-eff",
+              "field": "effectiveness",
+              "label": "Fair",
+              "color": "#f1c40f"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-2-2",
+          "label": "Sea trials and hydraulic system verification after repair",
+          "notes": "Sea trials conducted after repairs at Sao Luis. NAV 024 risk assessment template applies to sea trials after main engine repair.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-2-2-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "consequence-3",
+      "label": "External towage, operational disruption, ~USD 318,398 cost and reputational impact",
+      "notes": "Vessel towed to Sao Luis by tugs Svitzer Denise and Joaquim. Total estimated cost USD 318,398 (11 days delay, materials, miscellaneous). Reputational impact on company.",
+      "mitigationBarriers": [
+        {
+          "id": "mb-3-1",
+          "label": "Emergency Towing Booklet and tug arrangement (Svitzer Denise / Joaquim)",
+          "notes": "Towage commenced 19/03/2026. NAV 029 risk assessment template applies to towing operations.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-3-1-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-3-2",
+          "label": "Flag/Class notification, dispensation and surveyor attendance",
+          "notes": "Marshall Islands flag and Class notified. Dispensation granted for single voyage to Sao Luis with surveyor attendance.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-3-2-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-3-3",
+          "label": "Permanent repairs with genuine spares at Sao Luis",
+          "notes": "Permanent repairs completed at Sao Luis with genuine spare parts. RoT Compensator restored to operational condition by 04/06/2026.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-3-3-eff",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    }
+  ],
+  "view": {
+    "zoom": 1,
+    "panX": 0,
+    "panY": 0
+  },
+  "createdAt": "2026-06-10T00:00:00.000Z",
+  "updatedAt": "2026-06-11T07:12:25.997Z"
+}
