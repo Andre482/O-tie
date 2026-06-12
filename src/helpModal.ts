@@ -21,7 +21,7 @@ export class HelpModal extends Modal {
 
 		this.addSection(body, "About O-Tie", [
 			"O-Tie is an Obsidian plugin for building risk bowtie diagrams with an interactive visual editor.",
-			"Inspired by Presight OpenRisk. Diagrams are stored as .bowtie JSON files in your vault and auto-save as you edit.",
+			"Diagrams are stored as .bowtie JSON files in your vault and auto-save as you edit.",
 		]);
 
 		this.addSection(body, "Getting started", [

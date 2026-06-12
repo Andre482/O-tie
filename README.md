@@ -2,8 +2,6 @@
 
 Build and edit **risk bowtie diagrams** in Obsidian with an interactive visual editor. O-Tie stores diagrams as `.bowtie` JSON files in your vault and auto-saves as you work.
 
-Inspired by the layout and workflow of [Presight OpenRisk](https://openrisk.presight.com/). O-Tie is an independent project and is not affiliated with Presight.
-
 ## Features
 
 - Interactive bowtie editor with fan-in/fan-out layout
