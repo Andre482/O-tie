@@ -3,3 +3,5 @@ main.js
 main.js.map
 .DS_Store
 *.log
+deploy.local.mjs
+deploy.local.ps1

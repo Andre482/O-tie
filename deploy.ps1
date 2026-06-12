@@ -1,6 +1,15 @@
-# Deploy O-Tie plugin to the active Obsidian vault
-$vaultPath = "C:\Users\User\OneDrive\Obsidian"
-$pluginDir = Join-Path $vaultPath ".obsidian\plugins\o-tie"
+# Deploy O-Tie to a local Obsidian vault (developer use only).
+# Set OBSIDIAN_VAULT_PATH to your vault root, or pass -VaultPath.
+param(
+	[string]$VaultPath = $env:OBSIDIAN_VAULT_PATH
+)
+
+if (-not $VaultPath) {
+	Write-Error "Set OBSIDIAN_VAULT_PATH or pass -VaultPath to your Obsidian vault root."
+	exit 1
+}
+
+$pluginDir = Join-Path $VaultPath ".obsidian\plugins\o-tie"
 $sourceDir = $PSScriptRoot
 
 Write-Host "Building plugin..."
@@ -14,15 +23,5 @@ New-Item -ItemType Directory -Force -Path $pluginDir | Out-Null
 Copy-Item (Join-Path $sourceDir "main.js") -Destination $pluginDir -Force
 Copy-Item (Join-Path $sourceDir "manifest.json") -Destination $pluginDir -Force
 Copy-Item (Join-Path $sourceDir "styles.css") -Destination $pluginDir -Force
-
-$communityPlugins = Join-Path $vaultPath ".obsidian\community-plugins.json"
-$enabled = @("o-tie")
-if (Test-Path $communityPlugins) {
-	$existing = Get-Content $communityPlugins -Raw | ConvertFrom-Json
-	foreach ($id in $existing) {
-		if ($id -ne "o-tie") { $enabled = @($id) + $enabled }
-	}
-}
-$enabled | ConvertTo-Json | Set-Content $communityPlugins -Encoding UTF8
 
 Write-Host "Done. Reload Obsidian (Ctrl+R) to activate O-Tie."

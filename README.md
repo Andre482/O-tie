@@ -1,6 +1,12 @@
 # O-Tie
 
-Build and edit **risk bowtie diagrams** in Obsidian with an interactive visual editor. O-Tie stores diagrams as `.bowtie` JSON files in your vault and auto-saves as you work.
+Build and edit **risk bowtie diagrams** in Obsidian with an interactive visual editor.
+
+## What is O-Tie?
+
+O-Tie is an Obsidian plugin for **bowtie risk analysis** — a visual method used in process safety, operations, and HSE work to show how a hazard can lead to a top event (loss of control), which threats can cause it, which consequences may follow, and which barriers prevent or reduce harm.
+
+Instead of drawing bowties in a separate tool, you create and maintain them as `.bowtie` files inside your vault. O-Tie provides a dedicated editor with pan/zoom, barrier stacks, escalation factors, undo/redo, and PNG export. Changes auto-save as you edit.
 
 ## Features
 
@@ -89,6 +95,19 @@ See [examples/steamcracker.bowtie](examples/steamcracker.bowtie).
 npm install
 npm run dev    # watch mode
 npm run build  # production build
+```
+
+To deploy a local build into a vault:
+
+```bash
+# Unix / macOS / Git Bash
+OBSIDIAN_PLUGIN_DIR="/path/to/vault/.obsidian/plugins/o-tie" npm run deploy
+```
+
+```powershell
+# Windows PowerShell
+$env:OBSIDIAN_VAULT_PATH = "C:\path\to\vault"
+.\deploy.ps1
 ```
 
 ## Third-party licenses
