@@ -1,9 +1,13 @@
 name: Release
 
+# Obsidian Community Plugins require the GitHub tag to match manifest.json
+# exactly (e.g. 1.0.1 — not v1.0.1).
+# Create releases with: git tag 1.0.1 && git push origin 1.0.1
+
 on:
   push:
     tags:
-      - "*"
+      - "[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
   build:

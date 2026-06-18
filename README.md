@@ -103,6 +103,17 @@ npm run dev    # watch mode
 npm run build  # production build
 ```
 
+### Releasing
+
+Obsidian expects the GitHub release tag to **match `manifest.json` exactly** (e.g. `1.0.1`, not `v1.0.1`).
+
+```bash
+npm version patch          # updates package.json, manifest.json, versions.json
+git push origin main --tags
+```
+
+Pushing a semver tag (e.g. `1.0.1`) triggers the GitHub Actions release workflow.
+
 To deploy a local build into a vault:
 
 ```bash
