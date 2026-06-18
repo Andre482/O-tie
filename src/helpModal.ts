@@ -1,6 +1,5 @@
 import { App, Modal } from "obsidian";
-
-const PLUGIN_VERSION = "1.0.0";
+import * as manifest from "../manifest.json";
 
 export class HelpModal extends Modal {
 	constructor(app: App) {
@@ -14,7 +13,7 @@ export class HelpModal extends Modal {
 
 		contentEl.createEl("p", {
 			cls: "o-tie-help-version",
-			text: `Version ${PLUGIN_VERSION}`,
+			text: `Version ${manifest.version}`,
 		});
 
 		const body = contentEl.createDiv({ cls: "o-tie-help-body" });
@@ -45,7 +44,24 @@ export class HelpModal extends Modal {
 			"Top Event (red) — the central loss-of-control event",
 			"Threats (gray) — left side; prevention barriers (green) sit on connectors to the top event",
 			"Consequences (purple) — right side; mitigation barriers (green) sit on connectors from the top event",
-			"Escalation factors (purple) — branch from barriers; can have escalation barriers",
+			"Escalation factors (purple, dashed) — branch downward from a barrier when something could weaken that barrier",
+			"Escalation barriers (purple, dashed) — sit on escalation factors and control those weakening influences",
+		]);
+
+		this.addSection(body, "Barriers", [
+			"A barrier is a control that stops or reduces risk along the main bowtie path. In O-Tie, barriers are green nodes on the connectors between threats/consequences and the top event.",
+			"Prevention barriers sit between a threat and the top event. They stop the threat from causing the top event — for example an alarm, an interlock, a procedure, or operator training.",
+			"Mitigation barriers sit between the top event and a consequence. They limit harm if the top event happens — for example emergency shutdown, fire suppression, or evacuation.",
+			"Add prevention barriers from a selected threat (+ Prevention Barrier in the inspector, the lane + button, or the barrier + on the threat node). Add mitigation barriers from a selected consequence the same way, or use + Barrier in the toolbar when a threat or consequence is selected.",
+			"Each barrier can carry an analysis stack (type, effectiveness, criticality, and more) — see Barrier analysis stacks below.",
+		]);
+
+		this.addSection(body, "Escalation factors and escalation barriers", [
+			"Barriers are not always reliable on their own. An escalation factor describes a condition that could weaken, bypass, or defeat a barrier — such as missed maintenance, fatigue, corrosion, or conflicting procedures.",
+			"In the diagram, escalation factors appear as purple dashed nodes branching below their parent barrier. Dashed connectors show that this is a secondary path: the factor does not replace the main threat-to-event or event-to-consequence flow, but explains how the barrier might fail.",
+			"An escalation barrier is a control targeted at the escalation factor itself — the measure that keeps the weakening influence in check. For example, if an escalation factor is “sensor not calibrated”, an escalation barrier might be “annual calibration program”.",
+			"To add an escalation factor, select a prevention or mitigation barrier, then click + Escalation factor in the inspector, the ⚡ button on the barrier, or use the context menu. To add an escalation barrier, select the escalation factor and use + Escalation barrier, the + button on the factor, or the context menu.",
+			"Name each node to match your risk assessment. Use notes in the inspector for evidence, assumptions, or actions. A complete bowtie often chains several barriers, each with its own escalation factors and escalation barriers where relevant.",
 		]);
 
 		this.addSection(body, "Editing", [
@@ -56,13 +72,6 @@ export class HelpModal extends Modal {
 			"Hover nodes for quick buttons: add barrier, add escalation, or delete.",
 			"Press Delete to remove the selected node.",
 			"Use the + buttons in lanes between threats/consequences and the top event to add barriers quickly.",
-		]);
-
-		this.addSection(body, "Barriers and escalation", [
-			"Prevention barriers block threats from reaching the top event.",
-			"Mitigation barriers reduce consequences after the top event.",
-			"Select a barrier, then use + Barrier or the context menu to add escalation factors.",
-			"Escalation factors can have their own escalation barriers.",
 		]);
 
 		this.addSection(body, "Barrier analysis stacks", [

@@ -63,7 +63,8 @@ export default class OTiePlugin extends Plugin {
 	onunload(): void {}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const loaded = (await this.loadData()) as Partial<OTieSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded ?? {});
 	}
 
 	async saveSettings(): Promise<void> {
@@ -91,26 +92,30 @@ export default class OTiePlugin extends Plugin {
 	}
 
 	private async createNewBowtie(): Promise<void> {
-		new NewBowtieNameModal(this.app, async (name) => {
-			const safeName = this.sanitizeFileName(name);
-			const folder = normalizePath(this.settings.defaultFolder);
-			await this.ensureFolder(folder);
-
-			const basePath = folder ? `${folder}/${safeName}` : safeName;
-			const filePath = getBowtieFilePath(basePath);
-
-			if (this.app.vault.getAbstractFileByPath(filePath)) {
-				new Notice(`A bowtie named "${safeName}" already exists.`);
-				return;
-			}
-
-			const bowtie = createBowtie(name);
-			bowtie.hazard = "Hazard";
-			bowtie.topEvent = "Top Event";
-
-			const file = await this.app.vault.create(filePath, serializeBowtie(bowtie));
-			await this.openBowtieFile(file);
+		new NewBowtieNameModal(this.app, (name) => {
+			void this.createBowtieFromName(name);
 		}).open();
+	}
+
+	private async createBowtieFromName(name: string): Promise<void> {
+		const safeName = this.sanitizeFileName(name);
+		const folder = normalizePath(this.settings.defaultFolder);
+		await this.ensureFolder(folder);
+
+		const basePath = folder ? `${folder}/${safeName}` : safeName;
+		const filePath = getBowtieFilePath(basePath);
+
+		if (this.app.vault.getAbstractFileByPath(filePath)) {
+			new Notice(`A bowtie named "${safeName}" already exists.`);
+			return;
+		}
+
+		const bowtie = createBowtie(name);
+		bowtie.hazard = "Hazard";
+		bowtie.topEvent = "Top Event";
+
+		const file = await this.app.vault.create(filePath, serializeBowtie(bowtie));
+		await this.openBowtieFile(file);
 	}
 
 	async openBowtieFile(file: TFile): Promise<void> {

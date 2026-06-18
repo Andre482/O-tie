@@ -38,6 +38,7 @@ const EXPORT_CHROME_SELECTORS = [
 
 function copyThemeVariables(from: HTMLElement, to: HTMLElement): void {
 	const styles = getComputedStyle(from);
+	const props: Record<string, string> = {};
 	for (let i = 0; i < styles.length; i++) {
 		const name = styles[i];
 		if (
@@ -46,14 +47,15 @@ function copyThemeVariables(from: HTMLElement, to: HTMLElement): void {
 			name.startsWith("--interactive") ||
 			name.startsWith("--radius")
 		) {
-			to.style.setProperty(name, styles.getPropertyValue(name));
+			props[name] = styles.getPropertyValue(name);
 		}
 	}
 
 	// Node cards always use light pastel fills — keep export text readable in dark mode.
-	to.style.setProperty("--text-normal", "#1a1a1a");
-	to.style.setProperty("--text-muted", "#5d6d7e");
-	to.style.setProperty("--background-primary", "#ffffff");
+	props["--text-normal"] = "#1a1a1a";
+	props["--text-muted"] = "#5d6d7e";
+	props["--background-primary"] = "#ffffff";
+	to.setCssProps(props);
 }
 
 function prepareExportClone(clone: HTMLElement): void {
@@ -122,35 +124,32 @@ function buildDiagramLayer(
 	nodesEl: HTMLElement,
 	bounds: { width: number; height: number }
 ): HTMLElement {
-	const layer = document.createElement("div");
+	const layer = activeDocument.createElement("div");
 	layer.className = "o-tie-export-layer";
-	layer.style.position = "relative";
-	layer.style.width = `${bounds.width}px`;
-	layer.style.height = `${bounds.height}px`;
-	layer.style.overflow = "visible";
+	layer.setCssStyles({
+		width: `${bounds.width}px`,
+		height: `${bounds.height}px`,
+	});
 
-	const edgeImg = document.createElement("img");
+	const edgeImg = activeDocument.createElement("img");
 	edgeImg.className = "o-tie-export-edges";
 	edgeImg.alt = "";
 	edgeImg.src = svgToDataUrl(svgEl);
 	edgeImg.width = bounds.width;
 	edgeImg.height = bounds.height;
-	edgeImg.style.position = "absolute";
-	edgeImg.style.top = "0";
-	edgeImg.style.left = "0";
-	edgeImg.style.width = `${bounds.width}px`;
-	edgeImg.style.height = `${bounds.height}px`;
-	edgeImg.style.pointerEvents = "none";
+	edgeImg.setCssStyles({
+		width: `${bounds.width}px`,
+		height: `${bounds.height}px`,
+	});
 	layer.appendChild(edgeImg);
 
 	const nodesClone = nodesEl.cloneNode(true) as HTMLElement;
 	prepareExportClone(nodesClone);
-	nodesClone.style.position = "absolute";
-	nodesClone.style.top = "0";
-	nodesClone.style.left = "0";
-	nodesClone.style.width = `${bounds.width}px`;
-	nodesClone.style.height = `${bounds.height}px`;
-	nodesClone.style.overflow = "visible";
+	nodesClone.classList.add("o-tie-export-nodes");
+	nodesClone.setCssStyles({
+		width: `${bounds.width}px`,
+		height: `${bounds.height}px`,
+	});
 	layer.appendChild(nodesClone);
 
 	return layer;
@@ -208,48 +207,43 @@ export async function rasterizeBowtieForExport(options: BowtieExportOptions): Pr
 
 	// Offscreen wrapper carries the positioning offset so it is NOT inlined
 	// onto the captured element (which would push content out of the frame).
-	const wrapper = document.createElement("div");
-	wrapper.style.cssText =
-		"position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;";
+	const wrapper = activeDocument.createElement("div");
+	wrapper.className = "o-tie-export-wrapper";
 
-	const root = document.createElement("div");
+	const root = activeDocument.createElement("div");
 	root.className = "o-tie-view-root o-tie-export-root";
-	root.style.position = "relative";
-	root.style.left = "0";
-	root.style.top = "0";
-	root.style.overflow = "hidden";
-	root.style.opacity = "1";
-	root.style.visibility = "visible";
-	root.style.width = `${exportWidth}px`;
-	root.style.height = `${exportHeight}px`;
+	root.setCssStyles({
+		width: `${exportWidth}px`,
+		height: `${exportHeight}px`,
+	});
 	copyThemeVariables(viewRootEl, root);
 
 	const bgStyles = getComputedStyle(viewRootEl);
 	const dotColor =
 		bgStyles.getPropertyValue("--background-modifier-border").trim() || "#d0d0d0";
-	root.style.backgroundColor = backgroundColor;
+	const rootBg: Partial<CSSStyleDeclaration> = { backgroundColor };
 	if (showGrid) {
-		root.style.backgroundImage = buildGridBackground(backgroundColor, dotColor);
-		root.style.backgroundSize = `${GRID_SIZE}px ${GRID_SIZE}px`;
-		root.style.backgroundPosition = `${EXPORT_PADDING}px ${EXPORT_PADDING}px`;
+		rootBg.backgroundImage = buildGridBackground(backgroundColor, dotColor);
+		rootBg.backgroundSize = `${GRID_SIZE}px ${GRID_SIZE}px`;
+		rootBg.backgroundPosition = `${EXPORT_PADDING}px ${EXPORT_PADDING}px`;
 	}
+	root.setCssStyles(rootBg);
 
-	const stage = document.createElement("div");
+	const stage = activeDocument.createElement("div");
 	stage.className = "o-tie-export-stage";
-	stage.style.position = "absolute";
-	stage.style.width = `${bounds.width}px`;
-	stage.style.height = `${bounds.height}px`;
-	stage.style.left = `${EXPORT_PADDING - (crop?.x ?? 0)}px`;
-	stage.style.top = `${EXPORT_PADDING - (crop?.y ?? 0)}px`;
-	stage.style.overflow = "visible";
-
+	stage.setCssStyles({
+		width: `${bounds.width}px`,
+		height: `${bounds.height}px`,
+		left: `${EXPORT_PADDING - (crop?.x ?? 0)}px`,
+		top: `${EXPORT_PADDING - (crop?.y ?? 0)}px`,
+	});
 	stage.appendChild(buildDiagramLayer(svgEl, nodesEl, bounds));
 	root.appendChild(stage);
 	wrapper.appendChild(root);
-	document.body.appendChild(wrapper);
+	activeDocument.body.appendChild(wrapper);
 
 	try {
-		await document.fonts.ready;
+		await activeDocument.fonts.ready;
 		await Promise.all(
 			Array.from(root.querySelectorAll<HTMLImageElement>("img.o-tie-export-edges")).map(
 				(img) => {
@@ -269,7 +263,7 @@ export async function rasterizeBowtieForExport(options: BowtieExportOptions): Pr
 
 export function downloadPng(blob: Blob, filename: string): void {
 	const url = URL.createObjectURL(blob);
-	const anchor = document.createElement("a");
+	const anchor = activeDocument.createElement("a");
 	anchor.href = url;
 	anchor.download = filename.endsWith(".png") ? filename : `${filename}.png`;
 	anchor.click();

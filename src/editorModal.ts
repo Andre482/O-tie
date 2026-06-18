@@ -21,7 +21,7 @@ export class NewBowtieNameModal extends Modal {
 				text.inputEl.addEventListener("keydown", (e) => {
 					if (e.key === "Enter") this.submit(text.getValue());
 				});
-				setTimeout(() => text.inputEl.focus(), 50);
+				window.setTimeout(() => text.inputEl.focus(), 50);
 			});
 
 		const actions = contentEl.createDiv({ cls: "o-tie-actions" });

@@ -29,7 +29,7 @@ export class OTieSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "O-Tie Settings" });
+		new Setting(containerEl).setName("O-Tie Settings").setHeading();
 
 		new Setting(containerEl)
 			.setName("Default folder")

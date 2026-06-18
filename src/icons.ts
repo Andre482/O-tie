@@ -32,5 +32,5 @@ export function registerPluginIcon(): void {
 
 /** Make the ribbon button icon slightly larger than default. */
 export function styleRibbonIcon(el: HTMLElement): void {
-	el.style.setProperty("--icon-size", "var(--icon-size-l)");
+	el.setCssProps({ "--icon-size": "var(--icon-size-l)" });
 }

@@ -61,7 +61,6 @@ export class ExportImageModal extends Modal {
 				slider
 					.setLimits(1, 4, 0.5)
 					.setValue(this.scale)
-					.setDynamicTooltip()
 					.onChange((value) => {
 						this.scale = value;
 					})

@@ -89,6 +89,12 @@ Open **Settings → O-Tie** to configure:
 
 See [examples/steamcracker.bowtie](examples/steamcracker.bowtie).
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
+**Latest (1.0.1):** Fixes lane add (`+`) button placement on curved connectors, improves layering so buttons stay behind nodes, and aligns threat/consequence lane controls.
+
 ## Development
 
 ```bash

@@ -11,6 +11,8 @@ import {
 	type EdgePath,
 	type LayoutConfig,
 	type PositionedNode,
+	bezierPointAt,
+	connectionPorts,
 } from "./layout";
 import {
 	BARRIER_STACK_FIELDS,
@@ -54,11 +56,23 @@ const STACK_ROW_COLOR_OPTIONS: { color: string; label: string }[] = [
 
 const LIGHT_STACK_ROW_COLORS = new Set(["#ffffff", "#f4ecf7", "#eafaf1"]);
 
+function isLightStackColor(color: string): boolean {
+	if (LIGHT_STACK_ROW_COLORS.has(color)) return true;
+	const match = /^#([0-9a-f]{6})$/i.exec(color);
+	if (!match) return false;
+	const n = parseInt(match[1], 16);
+	const r = (n >> 16) & 0xff;
+	const g = (n >> 8) & 0xff;
+	const b = n & 0xff;
+	const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+	return luminance > 0.62;
+}
+
 function createColorMenuTitle(color: string, label: string): DocumentFragment {
-	const frag = document.createDocumentFragment();
+	const frag = activeDocument.createDocumentFragment();
 	const wrap = frag.createEl("span", { cls: "o-tie-color-menu-title" });
 	const swatch = wrap.createEl("span", { cls: "o-tie-color-swatch" });
-	swatch.style.backgroundColor = color;
+	swatch.setCssStyles({ backgroundColor: color });
 	if (LIGHT_STACK_ROW_COLORS.has(color)) {
 		swatch.addClass("o-tie-color-swatch-light");
 	}
@@ -279,7 +293,7 @@ export class BowtieView extends TextFileView {
 
 		this.transformEl = this.stageEl.createDiv({ cls: "o-tie-transform" });
 		const ns = "http://www.w3.org/2000/svg";
-		this.svgEl = document.createElementNS(ns, "svg");
+		this.svgEl = activeDocument.createElementNS(ns, "svg");
 		this.svgEl.classList.add("o-tie-svg");
 		this.transformEl.appendChild(this.svgEl);
 
@@ -440,7 +454,7 @@ export class BowtieView extends TextFileView {
 			attr: { rows: "2" },
 		});
 		notesArea.value = notes;
-		requestAnimationFrame(() => this.fitInspectorNotesArea(notesArea));
+		window.requestAnimationFrame(() => this.fitInspectorNotesArea(notesArea));
 		notesArea.addEventListener("input", () => this.fitInspectorNotesArea(notesArea));
 		notesArea.addEventListener("change", () => {
 			if (notesArea.value === notes) return;
@@ -497,21 +511,24 @@ export class BowtieView extends TextFileView {
 	}
 
 	private fitInspectorNotesArea(textarea: HTMLTextAreaElement): void {
-		textarea.style.height = "0";
-		textarea.style.height = `${textarea.scrollHeight}px`;
+		textarea.addClass("o-tie-inspector-notes-resize");
+		textarea.setCssStyles({ height: `${textarea.scrollHeight}px` });
+		textarea.removeClass("o-tie-inspector-notes-resize");
 	}
 
 	private renderDiagram(): void {
 		const layout = layoutBowtie(this.bowtie, this.getLayoutConfig());
 
-		this.transformEl.style.width = `${layout.bounds.width}px`;
-		this.transformEl.style.height = `${layout.bounds.height}px`;
+		this.transformEl.setCssStyles({
+			width: `${layout.bounds.width}px`,
+			height: `${layout.bounds.height}px`,
+		});
 		this.svgEl.setAttribute("width", String(layout.bounds.width));
 		this.svgEl.setAttribute("height", String(layout.bounds.height));
 		this.svgEl.innerHTML = "";
 
 		for (const edge of layout.edges) {
-			const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+			const path = activeDocument.createElementNS("http://www.w3.org/2000/svg", "path");
 			path.setAttribute("d", edge.path);
 			path.setAttribute("class", `o-tie-edge o-tie-edge-${edge.kind}`);
 			this.svgEl.appendChild(path);
@@ -519,10 +536,10 @@ export class BowtieView extends TextFileView {
 		}
 
 		this.nodesEl.empty();
+		this.renderLaneAddButtons(layout);
 		for (const node of layout.nodes) {
 			this.renderNode(node);
 		}
-		this.renderLaneAddButtons(layout);
 
 		this.applyTransform();
 
@@ -536,11 +553,11 @@ export class BowtieView extends TextFileView {
 		const { x, y, angleDeg } = edge.arrow;
 		const size = 8;
 
-		const group = document.createElementNS(ns, "g");
+		const group = activeDocument.createElementNS(ns, "g");
 		group.setAttribute("class", `o-tie-edge-arrow o-tie-edge-arrow-${edge.kind}`);
 		group.setAttribute("transform", `translate(${x} ${y}) rotate(${angleDeg})`);
 
-		const head = document.createElementNS(ns, "path");
+		const head = activeDocument.createElementNS(ns, "path");
 		head.setAttribute("d", `M0 0 L-${size} ${-size * 0.42} L-${size} ${size * 0.42} Z`);
 		group.appendChild(head);
 		this.svgEl.appendChild(group);
@@ -551,10 +568,12 @@ export class BowtieView extends TextFileView {
 			cls: `o-tie-node-wrap o-tie-node-wrap-${node.kind}`,
 			attr: { "data-ref": nodeRefKey(node.ref) },
 		});
-		wrap.style.left = `${node.x}px`;
-		wrap.style.top = `${node.y}px`;
-		wrap.style.width = `${node.width}px`;
-		wrap.style.height = `${node.height}px`;
+		wrap.setCssStyles({
+			left: `${node.x}px`,
+			top: `${node.y}px`,
+			width: `${node.width}px`,
+			height: `${node.height}px`,
+		});
 
 		if (this.selectedRef && nodeRefKey(this.selectedRef) === nodeRefKey(node.ref)) {
 			wrap.addClass("o-tie-node-selected");
@@ -665,8 +684,10 @@ export class BowtieView extends TextFileView {
 			: layout.barrierHeaderHeight;
 
 		const header = el.createDiv({ cls: "o-tie-barrier-header" });
-		header.style.height = `${headerH}px`;
-		header.style.minHeight = `${headerH}px`;
+		header.setCssStyles({
+			height: `${headerH}px`,
+			minHeight: `${headerH}px`,
+		});
 
 		const stripe = header.createDiv({ cls: "o-tie-node-stripe" });
 		stripe.setText(node.subtitle);
@@ -696,7 +717,7 @@ export class BowtieView extends TextFileView {
 			const chevron = wrap.createEl("button", {
 				cls: `o-tie-stack-chevron${collapsed ? " is-collapsed" : ""}`,
 			});
-			chevron.style.top = `${headerH}px`;
+			chevron.setCssStyles({ top: `${headerH}px` });
 			chevron.setAttribute("aria-label", collapsed ? "Expand stack" : "Collapse stack");
 			chevron.addEventListener("mousedown", (e) => e.stopPropagation());
 			chevron.addEventListener("click", (e) => {
@@ -710,7 +731,7 @@ export class BowtieView extends TextFileView {
 			if (stack.length === 0) {
 				const placeholder = stackEl.createDiv({ cls: "o-tie-stack-empty" });
 				placeholder.setText("Click + to add analysis row");
-				placeholder.style.height = `${layout.barrierStackRowHeight}px`;
+				placeholder.setCssStyles({ height: `${layout.barrierStackRowHeight}px` });
 				placeholder.addEventListener("click", (e) => {
 					e.stopPropagation();
 					this.showAddStackRowMenu(e, node.ref);
@@ -739,19 +760,21 @@ export class BowtieView extends TextFileView {
 			cls: "o-tie-stack-row",
 			attr: { "data-stack-id": item.id },
 		});
-		row.style.height = `${layout.barrierStackRowHeight}px`;
+		const rowStyles: Partial<CSSStyleDeclaration> = {
+			height: `${layout.barrierStackRowHeight}px`,
+		};
 		if (item.color) {
-			row.style.backgroundColor = item.color;
-			if (item.color === "#ffffff" || item.color === "#f4ecf7" || item.color === "#eafaf1") {
+			rowStyles.backgroundColor = item.color;
+			if (isLightStackColor(item.color)) {
 				row.addClass("o-tie-stack-row-light");
 			}
 		}
+		row.setCssStyles(rowStyles);
 
 		const fieldDef = item.field
 			? BARRIER_STACK_FIELDS.find((f) => f.key === item.field)
 			: undefined;
 		if (fieldDef) {
-			row.style.borderLeftColor = "var(--o-tie-barrier)";
 			row.addClass("o-tie-stack-row-preset");
 		}
 
@@ -872,9 +895,9 @@ export class BowtieView extends TextFileView {
 
 		if (!field) {
 			window.setTimeout(() => {
-				const rowEl = this.nodesEl.querySelector(
+				const rowEl = this.nodesEl.querySelector<HTMLElement>(
 					`[data-ref="${nodeRefKey(ref)}"] [data-stack-id="${item.id}"] .o-tie-stack-row-label`
-				) as HTMLElement | null;
+				);
 				if (rowEl) {
 					this.startInlineEdit(rowEl, label, (v) => {
 						this.updateStackRowLabel(ref, item.id, v);
@@ -944,9 +967,9 @@ export class BowtieView extends TextFileView {
 		} else {
 			menu.addItem((item) =>
 				item.setTitle("Edit label").setIcon("pencil").onClick(() => {
-					const rowEl = this.nodesEl.querySelector(
+					const rowEl = this.nodesEl.querySelector<HTMLElement>(
 						`[data-ref="${nodeRefKey(ref)}"] [data-stack-id="${itemId}"] .o-tie-stack-row-label`
-					) as HTMLElement | null;
+					);
 					if (rowEl) {
 						this.startInlineEdit(rowEl, stackItem.label, (v) => {
 							this.updateStackRowLabel(ref, itemId, v);
@@ -1039,7 +1062,7 @@ export class BowtieView extends TextFileView {
 		initial: string,
 		onCommit: (value: string) => void
 	): void {
-		const input = document.createElement("input");
+		const input = activeDocument.createElement("input");
 		input.type = "text";
 		input.className = "o-tie-inline-edit";
 		input.value = initial;
@@ -1154,7 +1177,7 @@ export class BowtieView extends TextFileView {
 			this.nodesEl.querySelectorAll(".o-tie-node-wrap").forEach((n) => n.removeClass("o-tie-node-selected"));
 		});
 
-		this.registerDomEvent(document, "keydown", (e) => {
+		this.registerDomEvent(activeDocument, "keydown", (e) => {
 			if (this.app.workspace.getActiveViewOfType(BowtieView) !== this) return;
 			const target = e.target as HTMLElement;
 			if (target.closest("input, textarea, [contenteditable='true']")) return;
@@ -1208,23 +1231,26 @@ export class BowtieView extends TextFileView {
 		const { panX, panY, zoom } = view;
 
 		// Pan and zoom on separate layers so zoom anchors correctly under the cursor.
-		this.viewportEl.style.transform = `translate3d(${panX}px, ${panY}px, 0)`;
-		this.viewportEl.style.transformOrigin = "0 0";
+		this.viewportEl.setCssStyles({
+			transform: `translate3d(${panX}px, ${panY}px, 0)`,
+			transformOrigin: "0 0",
+		});
 
 		if (BowtieView.useCssZoom) {
-			this.stageEl.style.zoom = String(zoom);
-			this.stageEl.style.transform = "";
+			this.stageEl.setCssStyles({ zoom: String(zoom), transform: "" });
 		} else {
-			this.stageEl.style.zoom = "1";
-			this.stageEl.style.transform = `scale(${zoom})`;
-			this.stageEl.style.transformOrigin = "0 0";
+			this.stageEl.setCssStyles({
+				zoom: "1",
+				transform: `scale(${zoom})`,
+				transformOrigin: "0 0",
+			});
 		}
 
 		if (this.containerEl_) {
 			const gs = BowtieView.GRID_SIZE;
 			const bgX = ((panX % gs) + gs) % gs;
 			const bgY = ((panY % gs) + gs) % gs;
-			this.containerEl_.style.backgroundPosition = `${bgX}px ${bgY}px`;
+			this.containerEl_.setCssStyles({ backgroundPosition: `${bgX}px ${bgY}px` });
 		}
 	}
 
@@ -1420,25 +1446,16 @@ export class BowtieView extends TextFileView {
 			);
 			if (!threatNode) continue;
 
-			const lastBarrier = layout.nodes
-				.filter(
-					(n) =>
-						n.kind === "preventionBarrier" && n.ref.threatId === threat.id
-				)
-				.sort((a, b) => b.x - a.x)[0];
-
+			const lastBarrier = this.findLastBarrierInLane(
+				layout,
+				(n) => n.kind === "preventionBarrier" && n.ref.threatId === threat.id
+			);
 			const fromNode = lastBarrier ?? threatNode;
-			const fromX = fromNode.x + fromNode.width;
-			const toX = topEvent.x;
-			const fromY = fromNode.y + fromNode.height / 2;
-			const toY = topEvent.y + topEvent.height / 2;
-			const y = (fromY + toY) / 2;
+			const pos = this.laneAddPosition(fromNode, topEvent, layout);
+			if (!pos) continue;
 
-			this.createLaneAddButton(
-				(fromX + toX) / 2 - 13,
-				y - 13,
-				"Add prevention barrier",
-				() => this.addPreventionBarrier(threat.id)
+			this.createLaneAddButton(pos.x, pos.y, "Add prevention barrier", () =>
+				this.addPreventionBarrier(threat.id)
 			);
 		}
 
@@ -1448,29 +1465,74 @@ export class BowtieView extends TextFileView {
 			);
 			if (!consNode) continue;
 
-			const mitigationBarriers = layout.nodes
-				.filter(
-					(n) =>
-						n.kind === "mitigationBarrier" &&
-						n.ref.consequenceId === consequence.id
-				)
-				.sort((a, b) => a.x - b.x);
-			const lastMitigation = mitigationBarriers[mitigationBarriers.length - 1];
+			const lastMitigation = this.findLastBarrierInLane(
+				layout,
+				(n) =>
+					n.kind === "mitigationBarrier" &&
+					n.ref.consequenceId === consequence.id
+			);
 
 			const fromNode = lastMitigation ?? topEvent;
-			const fromX = fromNode.x + fromNode.width;
-			const toX = consNode.x;
-			const fromY = fromNode.y + fromNode.height / 2;
-			const toY = consNode.y + consNode.height / 2;
-			const y = (fromY + toY) / 2;
+			const pos = this.laneAddPosition(fromNode, consNode, layout);
+			if (!pos) continue;
 
-			this.createLaneAddButton(
-				(fromX + toX) / 2 - 13,
-				y - 13,
-				"Add mitigation barrier",
-				() => this.addMitigationBarrier(consequence.id)
+			this.createLaneAddButton(pos.x, pos.y, "Add mitigation barrier", () =>
+				this.addMitigationBarrier(consequence.id)
 			);
 		}
+	}
+
+	private findLastBarrierInLane(
+		layout: import("./layout").LayoutResult,
+		match: (node: PositionedNode) => boolean
+	): PositionedNode | undefined {
+		return layout.nodes.filter(match).sort((a, b) => a.x - b.x).pop();
+	}
+
+	private laneAddPosition(
+		from: PositionedNode,
+		to: PositionedNode,
+		layout: import("./layout").LayoutResult
+	): { x: number; y: number } | null {
+		const LANE_ADD_SIZE = 26;
+		const LANE_ADD_HALF = 13;
+		const MIN_GAP = LANE_ADD_SIZE + 4;
+
+		const ports = connectionPorts(from, to);
+		const gap = ports.to.x - ports.from.x;
+		if (gap < MIN_GAP) return null;
+
+		const point = bezierPointAt(ports.from.x, ports.from.y, ports.to.x, ports.to.y, 0.5);
+		const cx = point.x;
+		const cy = point.y;
+
+		for (const node of layout.nodes) {
+			if (node === from || node === to) continue;
+			if (this.laneAddOverlapsButton(cx, cy, LANE_ADD_HALF, node)) {
+				return null;
+			}
+		}
+
+		return { x: cx - LANE_ADD_HALF, y: cy - LANE_ADD_HALF };
+	}
+
+	private laneAddOverlapsButton(
+		cx: number,
+		cy: number,
+		half: number,
+		node: PositionedNode
+	): boolean {
+		const margin = 2;
+		const left = cx - half;
+		const right = cx + half;
+		const top = cy - half;
+		const bottom = cy + half;
+		return (
+			right > node.x + margin &&
+			left < node.x + node.width - margin &&
+			bottom > node.y + margin &&
+			top < node.y + node.height - margin
+		);
 	}
 
 	private createLaneAddButton(
@@ -1480,8 +1542,7 @@ export class BowtieView extends TextFileView {
 		onClick: () => void
 	): void {
 		const btn = this.nodesEl.createEl("button", { cls: "o-tie-lane-add o-tie-plus-btn" });
-		btn.style.left = `${x}px`;
-		btn.style.top = `${y}px`;
+		btn.setCssStyles({ left: `${x}px`, top: `${y}px` });
 		btn.setAttribute("aria-label", label);
 		btn.addEventListener("mousedown", (e) => e.stopPropagation());
 		btn.addEventListener("click", (e) => {

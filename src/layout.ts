@@ -25,7 +25,7 @@ export const DEFAULT_LAYOUT: LayoutConfig = {
 	barrierWidth: 140,
 	barrierHeight: 52,
 	barrierHeaderHeight: 52,
-	barrierStackRowHeight: 22,
+	barrierStackRowHeight: 24,
 	escalationWidth: 130,
 	escalationHeight: 44,
 	columnGap: 100,
@@ -168,16 +168,43 @@ function placeBarriersInLane(
 	);
 }
 
-function nodeCenter(node: PositionedNode): { x: number; y: number } {
-	return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
-}
-
 function nodeRight(node: PositionedNode): { x: number; y: number } {
 	return { x: node.x + node.width, y: node.y + node.height / 2 };
 }
 
 function nodeLeft(node: PositionedNode): { x: number; y: number } {
 	return { x: node.x, y: node.y + node.height / 2 };
+}
+
+/** Port points used for main-flow bezier edges between two nodes. */
+export function connectionPorts(
+	from: PositionedNode,
+	to: PositionedNode
+): { from: { x: number; y: number }; to: { x: number; y: number } } {
+	return { from: nodeRight(from), to: nodeLeft(to) };
+}
+
+/** Point on the same cubic bezier as {@link makeBezierEdge} at parameter t (0–1). */
+export function bezierPointAt(
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+	t: number,
+	curve = 0.35
+): { x: number; y: number } {
+	const dx = (x2 - x1) * curve;
+	const p1x = x1 + dx;
+	const p1y = y1;
+	const p2x = x2 - dx;
+	const p2y = y2;
+	const mt = 1 - t;
+	const mt2 = mt * mt;
+	const t2 = t * t;
+	return {
+		x: mt2 * mt * x1 + 3 * mt2 * t * p1x + 3 * mt * t2 * p2x + t2 * t * x2,
+		y: mt2 * mt * y1 + 3 * mt2 * t * p1y + 3 * mt * t2 * p2y + t2 * t * y2,
+	};
 }
 
 function nodeBottom(node: PositionedNode): { x: number; y: number } {
