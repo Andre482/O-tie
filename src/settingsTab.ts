@@ -29,8 +29,6 @@ export class OTieSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		new Setting(containerEl).setName("O-Tie Settings").setHeading();
-
 		new Setting(containerEl)
 			.setName("Default folder")
 			.setDesc("Folder where new bowtie files are created")

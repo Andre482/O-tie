@@ -1,5 +1,7 @@
 import { App, Modal } from "obsidian";
-import * as manifest from "../manifest.json";
+import * as manifestData from "../manifest.json";
+
+const PLUGIN_VERSION = (manifestData as { version: string }).version;
 
 export class HelpModal extends Modal {
 	constructor(app: App) {
@@ -13,7 +15,7 @@ export class HelpModal extends Modal {
 
 		contentEl.createEl("p", {
 			cls: "o-tie-help-version",
-			text: `Version ${manifest.version}`,
+			text: `Version ${PLUGIN_VERSION}`,
 		});
 
 		const body = contentEl.createDiv({ cls: "o-tie-help-body" });
