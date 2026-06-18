@@ -1,12 +1,8 @@
 # O-Tie
 
-Build and edit **risk bowtie diagrams** in Obsidian with an interactive visual editor.
+Build and edit **risk bowtie diagrams** in Obsidian with an interactive visual editor. O-Tie is for **bowtie risk analysis** — a visual method used in process safety, operations, and HSE work to show how a hazard can lead to a top event (loss of control), which threats can cause it, which consequences may follow, and which barriers prevent or reduce harm.
 
-## What is O-Tie?
-
-O-Tie is an Obsidian plugin for **bowtie risk analysis** — a visual method used in process safety, operations, and HSE work to show how a hazard can lead to a top event (loss of control), which threats can cause it, which consequences may follow, and which barriers prevent or reduce harm.
-
-Instead of drawing bowties in a separate tool, you create and maintain them as `.bowtie` files inside your vault. O-Tie provides a dedicated editor with pan/zoom, barrier stacks, escalation factors, undo/redo, and PNG export. Changes auto-save as you edit.
+Diagrams are stored as `.bowtie` files in your vault and auto-save as you edit.
 
 ## Features
 
@@ -91,9 +87,7 @@ See [examples/steamcracker.bowtie](examples/steamcracker.bowtie).
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release history.
-
-**Latest (1.0.1):** Fixes lane add (`+`) button placement on curved connectors, improves layering so buttons stay behind nodes, and aligns threat/consequence lane controls.
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Development
 
@@ -101,30 +95,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 npm install
 npm run dev    # watch mode
 npm run build  # production build
-```
-
-### Releasing
-
-Obsidian expects the GitHub release tag to **match `manifest.json` exactly** (e.g. `1.0.1`, not `v1.0.1`).
-
-```bash
-npm version patch          # updates package.json, manifest.json, versions.json
-git push origin main --tags
-```
-
-Pushing a semver tag (e.g. `1.0.1`) triggers the GitHub Actions release workflow.
-
-To deploy a local build into a vault:
-
-```bash
-# Unix / macOS / Git Bash
-OBSIDIAN_PLUGIN_DIR="/path/to/vault/.obsidian/plugins/o-tie" npm run deploy
-```
-
-```powershell
-# Windows PowerShell
-$env:OBSIDIAN_VAULT_PATH = "C:\path\to\vault"
-.\deploy.ps1
+npm run lint   # Obsidian plugin guidelines check
 ```
 
 ## Third-party licenses
