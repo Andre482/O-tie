@@ -2,6 +2,18 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.2] — 2026-06-19
+
+### Fixed
+
+- **Obsidian plugin review** — Removed redundant settings tab heading and typed manifest version import to satisfy community plugin lint checks.
+
+### Improved
+
+- **Development** — Added local `eslint-plugin-obsidianmd` setup with `npm run lint`.
+
+---
+
 ## [1.0.1] — 2026-06-18
 
 ### Fixed
