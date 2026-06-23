@@ -23,11 +23,11 @@ export const BARRIER_STACK_FIELDS: BarrierStackField[] = [
 		key: "type",
 		name: "Barrier type",
 		options: [
-			{ label: "Active Human", color: "#5dade2" },
-			{ label: "Reactive Human", color: "#3498db" },
-			{ label: "Active Hardware", color: "#48c9b0" },
-			{ label: "Reactive Hardware", color: "#1abc9c" },
 			{ label: "Passive Hardware", color: "#7f8c8d" },
+			{ label: "Continuous Hardware", color: "#1abc9c" },
+			{ label: "Active Hardware", color: "#48c9b0" },
+			{ label: "Active Hardware+Human", color: "#3498db" },
+			{ label: "Active Human", color: "#5dade2" },
 		],
 	},
 	{
@@ -83,11 +83,16 @@ export const BARRIER_STACK_FIELDS: BarrierStackField[] = [
 	},
 ];
 
-export interface EscalationFactor {
+export interface EscalationNode {
 	id: string;
 	label: string;
 	notes?: string;
-	escalationBarriers: Barrier[];
+}
+
+export interface DegradationChain {
+	id: string;
+	safeguards: EscalationNode[];
+	degradationFactor: EscalationNode;
 }
 
 export interface Barrier {
@@ -96,7 +101,7 @@ export interface Barrier {
 	notes?: string;
 	color?: string;
 	effectiveness?: BarrierEffectiveness;
-	escalationFactors: EscalationFactor[];
+	degradationChains: DegradationChain[];
 	stack?: BarrierStackItem[];
 	stackCollapsed?: boolean;
 }
@@ -115,6 +120,14 @@ export interface Consequence {
 	mitigationBarriers: Barrier[];
 }
 
+export interface TopEvent {
+	id: string;
+	label: string;
+	hazard: string;
+	notes?: string;
+	transitionBarriers: Barrier[];
+}
+
 export interface BowtieViewState {
 	zoom: number;
 	panX: number;
@@ -124,8 +137,7 @@ export interface BowtieViewState {
 export interface Bowtie {
 	id: string;
 	name: string;
-	hazard: string;
-	topEvent: string;
+	events: TopEvent[];
 	threats: Threat[];
 	consequences: Consequence[];
 	view?: BowtieViewState;
@@ -163,21 +175,28 @@ export function createBarrierStackItem(
 	};
 }
 
+export function createDegradationChain(label = "Degradation factor"): DegradationChain {
+	return {
+		id: generateId(),
+		safeguards: [],
+		degradationFactor: createEscalationNode(label),
+	};
+}
+
 export function createBarrier(label = ""): Barrier {
 	return {
 		id: generateId(),
 		label,
-		escalationFactors: [],
+		degradationChains: [],
 		stack: [],
 		stackCollapsed: true,
 	};
 }
 
-export function createEscalationFactor(label = ""): EscalationFactor {
+export function createEscalationNode(label = ""): EscalationNode {
 	return {
 		id: generateId(),
 		label,
-		escalationBarriers: [],
 	};
 }
 
@@ -197,13 +216,21 @@ export function createConsequence(label = ""): Consequence {
 	};
 }
 
+export function createTopEvent(label = "", hazard = "Hazard"): TopEvent {
+	return {
+		id: generateId(),
+		label,
+		hazard,
+		transitionBarriers: [],
+	};
+}
+
 export function createBowtie(name: string): Bowtie {
 	const now = new Date().toISOString();
 	return {
 		id: generateId(),
 		name,
-		hazard: "",
-		topEvent: "",
+		events: [createTopEvent("", "")],
 		threats: [],
 		consequences: [],
 		view: { zoom: 1, panX: 0, panY: 0 },
@@ -217,22 +244,101 @@ export function serializeBowtie(bowtie: Bowtie): string {
 }
 
 export function deserializeBowtie(json: string): Bowtie {
-	const data = JSON.parse(json) as Bowtie;
-	validateBowtie(data);
-	if (!data.view) {
-		data.view = { zoom: 1, panX: 0, panY: 0 };
+	const raw = JSON.parse(json) as Bowtie & { topEvent?: string; hazard?: string };
+	migrateLegacyBowtie(raw);
+	validateBowtie(raw);
+	if (!raw.view) {
+		raw.view = { zoom: 1, panX: 0, panY: 0 };
 	}
-	return data;
+	return raw;
+}
+
+function migrateLegacyBowtie(data: Bowtie & { topEvent?: string; hazard?: string }): void {
+	const legacyHazard = typeof data.hazard === "string" ? data.hazard : "";
+	if (!Array.isArray(data.events)) {
+		const legacyLabel = typeof data.topEvent === "string" ? data.topEvent : "";
+		data.events = [createTopEvent(legacyLabel, legacyHazard)];
+	}
+	delete data.topEvent;
+	delete data.hazard;
+	if (data.events.length === 0) {
+		data.events = [createTopEvent("")];
+	}
+	if (legacyHazard && !data.events[0].hazard) {
+		data.events[0].hazard = legacyHazard;
+	}
+	for (const event of data.events) {
+		if (typeof event.hazard !== "string") {
+			event.hazard = "";
+		}
+	}
 }
 
 export function cloneBowtie(bowtie: Bowtie): Bowtie {
 	return deserializeBowtie(serializeBowtie(bowtie));
 }
 
-function normalizeBarrier(barrier: Barrier): void {
-	if (!Array.isArray(barrier.escalationFactors)) {
-		barrier.escalationFactors = [];
+type LegacyEscalationFactor = {
+	id: string;
+	label?: string;
+	notes?: string;
+	safeguards?: EscalationNode[];
+	degradationFactor?: EscalationNode;
+	escalationBarriers?: Barrier[];
+};
+
+function normalizeBarrier(
+	barrier: Barrier & {
+		safeguards?: EscalationNode[];
+		degradationFactor?: EscalationNode;
+		escalationFactors?: LegacyEscalationFactor[];
 	}
+): void {
+	if (!Array.isArray(barrier.degradationChains)) {
+		barrier.degradationChains = [];
+	}
+
+	if (barrier.safeguards !== undefined || barrier.degradationFactor !== undefined) {
+		const safeguards = barrier.safeguards ?? [];
+		const degradation = barrier.degradationFactor ?? createEscalationNode("");
+		if (safeguards.length > 0 || degradation.label?.trim()) {
+			barrier.degradationChains.push({
+				id: generateId(),
+				safeguards,
+				degradationFactor: degradation,
+			});
+		}
+		delete barrier.safeguards;
+		delete barrier.degradationFactor;
+	}
+
+	if (Array.isArray(barrier.escalationFactors) && barrier.escalationFactors.length > 0) {
+		for (const factor of barrier.escalationFactors) {
+			const factorSafeguards = Array.isArray(factor.safeguards)
+				? factor.safeguards
+				: (factor.escalationBarriers ?? []).map((legacyBarrier) => ({
+						id: legacyBarrier.id,
+						label: legacyBarrier.label,
+						notes: legacyBarrier.notes,
+					}));
+			const safeguards = [...factorSafeguards];
+			if (factor.label?.trim()) {
+				safeguards.unshift({
+					id: factor.id,
+					label: factor.label,
+					notes: factor.notes,
+				});
+			}
+			barrier.degradationChains.push({
+				id: generateId(),
+				safeguards,
+				degradationFactor:
+					factor.degradationFactor ?? createEscalationNode("Degradation factor"),
+			});
+		}
+		delete barrier.escalationFactors;
+	}
+
 	if (!Array.isArray(barrier.stack)) {
 		barrier.stack = [];
 	} else {
@@ -240,6 +346,14 @@ function normalizeBarrier(barrier: Barrier): void {
 	}
 	if (barrier.stackCollapsed === undefined) {
 		barrier.stackCollapsed = true;
+	}
+	for (const chain of barrier.degradationChains) {
+		if (!Array.isArray(chain.safeguards)) {
+			chain.safeguards = [];
+		}
+		if (!chain.degradationFactor) {
+			chain.degradationFactor = createEscalationNode("Degradation factor");
+		}
 	}
 }
 
@@ -249,6 +363,20 @@ function validateBowtie(data: Bowtie): void {
 	}
 	if (!Array.isArray(data.threats) || !Array.isArray(data.consequences)) {
 		throw new Error("Invalid bowtie: threats and consequences must be arrays");
+	}
+	if (!Array.isArray(data.events) || data.events.length === 0) {
+		throw new Error("Invalid bowtie: events must be a non-empty array");
+	}
+	for (const event of data.events) {
+		if (typeof event.hazard !== "string") {
+			event.hazard = "";
+		}
+		if (!Array.isArray(event.transitionBarriers)) {
+			event.transitionBarriers = [];
+		}
+		for (const barrier of event.transitionBarriers) {
+			normalizeBarrier(barrier);
+		}
 	}
 	for (const threat of data.threats) {
 		for (const barrier of threat.preventionBarriers) {
@@ -260,6 +388,10 @@ function validateBowtie(data: Bowtie): void {
 			normalizeBarrier(barrier);
 		}
 	}
+}
+
+export function hasSafeguardChain(barrier: Barrier): boolean {
+	return barrier.degradationChains.length > 0;
 }
 
 export function getBowtieFilePath(basePath: string): string {
@@ -280,26 +412,29 @@ export type NodeKind =
 	| "consequence"
 	| "preventionBarrier"
 	| "mitigationBarrier"
-	| "escalationFactor"
-	| "escalationBarrier";
+	| "transitionBarrier"
+	| "safeguard"
+	| "degradationFactor";
 
 export interface NodeRef {
 	kind: NodeKind;
+	eventId?: string;
 	threatId?: string;
 	consequenceId?: string;
 	barrierId?: string;
-	escalationId?: string;
-	escalationBarrierId?: string;
+	chainId?: string;
+	safeguardId?: string;
 }
 
 export function nodeRefKey(ref: NodeRef): string {
 	const parts = [
 		ref.kind,
+		ref.eventId ?? "",
 		ref.threatId ?? "",
 		ref.consequenceId ?? "",
 		ref.barrierId ?? "",
-		ref.escalationId ?? "",
-		ref.escalationBarrierId ?? "",
+		ref.chainId ?? "",
+		ref.safeguardId ?? "",
 	];
 	return parts.join(":");
 }

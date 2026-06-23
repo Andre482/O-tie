@@ -83,7 +83,7 @@ Open **Settings → O-Tie** to configure:
 }
 ```
 
-See [examples/steamcracker.bowtie](examples/steamcracker.bowtie).
+See [examples/steamcracker.bowtie](examples/steamcracker.bowtie) and [examples/cold-storage-ammonia.bowtie](examples/cold-storage-ammonia.bowtie) (LinkedIn promo scenario).
 
 ## Changelog
 

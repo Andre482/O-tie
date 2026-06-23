@@ -1,0 +1,788 @@
+{
+  "id": "example-cold-storage-ammonia",
+  "name": "Cold Storage Ammonia Refrigeration",
+  "hazard": "Pressurized anhydrous ammonia (NH₃) refrigeration inventory",
+  "topEvent": "Loss of primary containment from ammonia refrigeration circuit",
+  "threats": [
+    {
+      "id": "threat-corrosion",
+      "label": "Corrosion or fatigue of piping, vessels, or evaporator coils",
+      "notes": "Credible in aged plant with cyclic thermal loading, condensate, or external corrosion under insulation.",
+      "preventionBarriers": [
+        {
+          "id": "pb-integrity",
+          "label": "Mechanical integrity inspection program",
+          "notes": "NDT, thickness monitoring, and replacement intervals per IIAR-6 / company standards.",
+          "escalationFactors": [
+            {
+              "id": "ef-deferred-inspection",
+              "label": "Deferred inspection due to production pressure",
+              "escalationBarriers": [
+                {
+                  "id": "eb-integrity-audit",
+                  "label": "QA audit of mechanical integrity backlog",
+                  "escalationFactors": [],
+                  "stack": [],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-integrity-type",
+              "field": "type",
+              "label": "Active Hardware",
+              "color": "#48c9b0"
+            },
+            {
+              "id": "stack-pb-integrity-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-pb-integrity-criticality",
+              "field": "criticality",
+              "label": "Very High",
+              "color": "#2c3e50"
+            },
+            {
+              "id": "stack-pb-integrity-responsible",
+              "field": "responsible",
+              "label": "Tech Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-integrity-validation",
+              "field": "validation",
+              "label": "Inspection",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-integrity-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": false
+        },
+        {
+          "id": "pb-materials",
+          "label": "Materials of construction and corrosion allowance per design standard",
+          "notes": "Compatible metallurgy, coatings, and design margin for operating conditions.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-pb-materials-type",
+              "field": "type",
+              "label": "Passive Hardware",
+              "color": "#7f8c8d"
+            },
+            {
+              "id": "stack-pb-materials-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-pb-materials-criticality",
+              "field": "criticality",
+              "label": "High",
+              "color": "#566573"
+            },
+            {
+              "id": "stack-pb-materials-responsible",
+              "field": "responsible",
+              "label": "Tech Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-materials-validation",
+              "field": "validation",
+              "label": "Inspection",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-materials-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "threat-impact",
+      "label": "Forklift or vehicle impact on exposed ammonia piping",
+      "notes": "Common in warehouse aisles adjacent to machine rooms or overhead pipe runs.",
+      "preventionBarriers": [
+        {
+          "id": "pb-protection",
+          "label": "Physical protection and traffic segregation",
+          "notes": "Bollards, rack guards, marked routes, and restricted access to machine room.",
+          "escalationFactors": [
+            {
+              "id": "ef-bollard-bypass",
+              "label": "Bollards removed or bypassed for convenience",
+              "escalationBarriers": [
+                {
+                  "id": "eb-supervisor-rounds",
+                  "label": "Supervisor housekeeping and barrier inspection rounds",
+                  "escalationFactors": [],
+                  "stack": [],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-protection-type",
+              "field": "type",
+              "label": "Passive Hardware",
+              "color": "#7f8c8d"
+            },
+            {
+              "id": "stack-pb-protection-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-pb-protection-criticality",
+              "field": "criticality",
+              "label": "High",
+              "color": "#566573"
+            },
+            {
+              "id": "stack-pb-protection-responsible",
+              "field": "responsible",
+              "label": "Operations",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-protection-validation",
+              "field": "validation",
+              "label": "Inspection",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-protection-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "threat-overpressure",
+      "label": "Overpressure in low-side or high-side refrigeration circuit",
+      "preventionBarriers": [
+        {
+          "id": "pb-relief",
+          "label": "Pressure relief devices and high-pressure interlocks",
+          "notes": "PSVs discharge to safe location; alarm and trip on abnormal pressure.",
+          "escalationFactors": [
+            {
+              "id": "ef-psv-blocked",
+              "label": "Relief device isolated, blocked, or inspection overdue",
+              "escalationBarriers": [
+                {
+                  "id": "eb-psv-program",
+                  "label": "PSV inspection and register management program",
+                  "escalationFactors": [],
+                  "stack": [],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-relief-type",
+              "field": "type",
+              "label": "Active Hardware",
+              "color": "#48c9b0"
+            },
+            {
+              "id": "stack-pb-relief-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-pb-relief-criticality",
+              "field": "criticality",
+              "label": "Very High",
+              "color": "#2c3e50"
+            },
+            {
+              "id": "stack-pb-relief-responsible",
+              "field": "responsible",
+              "label": "Tech Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-relief-validation",
+              "field": "validation",
+              "label": "Inspection",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-relief-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "threat-maintenance",
+      "label": "Maintenance isolation or re-commissioning error",
+      "preventionBarriers": [
+        {
+          "id": "pb-ptw",
+          "label": "Permit-to-work and LOTO procedures",
+          "notes": "Verified isolation, zero-energy confirmation, and ammonia-specific competency.",
+          "escalationFactors": [
+            {
+              "id": "ef-competency-gap",
+              "label": "Technician competency not verified for ammonia work",
+              "escalationBarriers": [
+                {
+                  "id": "eb-competency",
+                  "label": "Competency assessment and authorization records",
+                  "escalationFactors": [],
+                  "stack": [],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-pb-ptw-type",
+              "field": "type",
+              "label": "Active Human",
+              "color": "#5dade2"
+            },
+            {
+              "id": "stack-pb-ptw-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-pb-ptw-criticality",
+              "field": "criticality",
+              "label": "Very High",
+              "color": "#2c3e50"
+            },
+            {
+              "id": "stack-pb-ptw-responsible",
+              "field": "responsible",
+              "label": "Operations",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-ptw-validation",
+              "field": "validation",
+              "label": "Audit",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-ptw-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "threat-operator",
+      "label": "Operator error during startup, shutdown, or abnormal operation",
+      "preventionBarriers": [
+        {
+          "id": "pb-sop",
+          "label": "Operating procedures and abnormal situation guidance",
+          "notes": "Written procedures for charge management, alarms, and emergency slowdown.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-pb-sop-type",
+              "field": "type",
+              "label": "Active Human",
+              "color": "#5dade2"
+            },
+            {
+              "id": "stack-pb-sop-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-pb-sop-criticality",
+              "field": "criticality",
+              "label": "High",
+              "color": "#566573"
+            },
+            {
+              "id": "stack-pb-sop-responsible",
+              "field": "responsible",
+              "label": "Operations",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-sop-validation",
+              "field": "validation",
+              "label": "Audit",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-sop-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "pb-training",
+          "label": "Operator training and competency assurance",
+          "notes": "Refresher training on ammonia properties, alarms, and first actions.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-pb-training-type",
+              "field": "type",
+              "label": "Reactive Human",
+              "color": "#3498db"
+            },
+            {
+              "id": "stack-pb-training-effectiveness",
+              "field": "effectiveness",
+              "label": "Fair",
+              "color": "#f1c40f"
+            },
+            {
+              "id": "stack-pb-training-criticality",
+              "field": "criticality",
+              "label": "Medium",
+              "color": "#7f8c8d"
+            },
+            {
+              "id": "stack-pb-training-responsible",
+              "field": "responsible",
+              "label": "HSE Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-training-validation",
+              "field": "validation",
+              "label": "Drills and Exercise",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-training-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "threat-external-fire",
+      "label": "External fire impinging on ammonia equipment or pipework",
+      "notes": "Warehouse fire, arcing electrical equipment, or hot work in adjacent area.",
+      "preventionBarriers": [
+        {
+          "id": "pb-fire-prevention",
+          "label": "Fire prevention and hot-work controls in ammonia areas",
+          "notes": "Housekeeping, fire detection, hot-work permits, and separation from combustibles.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-pb-fire-prevention-type",
+              "field": "type",
+              "label": "Active Human",
+              "color": "#5dade2"
+            },
+            {
+              "id": "stack-pb-fire-prevention-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-pb-fire-prevention-criticality",
+              "field": "criticality",
+              "label": "High",
+              "color": "#566573"
+            },
+            {
+              "id": "stack-pb-fire-prevention-responsible",
+              "field": "responsible",
+              "label": "HSE Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-fire-prevention-validation",
+              "field": "validation",
+              "label": "Audit",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-pb-fire-prevention-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    }
+  ],
+  "consequences": [
+    {
+      "id": "consequence-exposure",
+      "label": "Personnel harm due to toxic ammonia exposure",
+      "mitigationBarriers": [
+        {
+          "id": "mb-detection",
+          "label": "Fixed ammonia gas detection and alarm",
+          "notes": "Audible/visual alarm, potential automatic isolation or ventilation actuation.",
+          "escalationFactors": [
+            {
+              "id": "ef-calibration",
+              "label": "Sensor calibration overdue or drift",
+              "escalationBarriers": [
+                {
+                  "id": "eb-calibration-program",
+                  "label": "Calibration management and functional test program",
+                  "escalationFactors": [],
+                  "stack": [],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-mb-detection-type",
+              "field": "type",
+              "label": "Active Hardware",
+              "color": "#48c9b0"
+            },
+            {
+              "id": "stack-mb-detection-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-mb-detection-criticality",
+              "field": "criticality",
+              "label": "Very High",
+              "color": "#2c3e50"
+            },
+            {
+              "id": "stack-mb-detection-responsible",
+              "field": "responsible",
+              "label": "HSE Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-detection-validation",
+              "field": "validation",
+              "label": "Barrier Test",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-detection-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": false
+        },
+        {
+          "id": "mb-ventilation",
+          "label": "Emergency ventilation and isolation valves",
+          "notes": "Reduce airborne concentration; close isolation valves where safe to do so.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-ventilation-type",
+              "field": "type",
+              "label": "Active Hardware",
+              "color": "#48c9b0"
+            },
+            {
+              "id": "stack-mb-ventilation-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-mb-ventilation-criticality",
+              "field": "criticality",
+              "label": "Very High",
+              "color": "#2c3e50"
+            },
+            {
+              "id": "stack-mb-ventilation-responsible",
+              "field": "responsible",
+              "label": "Tech Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-ventilation-validation",
+              "field": "validation",
+              "label": "Barrier Test",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-ventilation-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-evacuation",
+          "label": "Personnel evacuation and emergency muster",
+          "notes": "Alarm response, headcount, and upwind assembly per ERP.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-evacuation-type",
+              "field": "type",
+              "label": "Reactive Human",
+              "color": "#3498db"
+            },
+            {
+              "id": "stack-mb-evacuation-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-mb-evacuation-criticality",
+              "field": "criticality",
+              "label": "High",
+              "color": "#566573"
+            },
+            {
+              "id": "stack-mb-evacuation-responsible",
+              "field": "responsible",
+              "label": "HSE Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-evacuation-validation",
+              "field": "validation",
+              "label": "Drills and Exercise",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-evacuation-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "consequence-environment",
+      "label": "Environmental damage due to ammonia release",
+      "mitigationBarriers": [
+        {
+          "id": "mb-containment",
+          "label": "Containment sump and emergency dilution / knock-down",
+          "notes": "Limit spread to drains, waterways, or off-site receptors.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-containment-type",
+              "field": "type",
+              "label": "Passive Hardware",
+              "color": "#7f8c8d"
+            },
+            {
+              "id": "stack-mb-containment-effectiveness",
+              "field": "effectiveness",
+              "label": "Fair",
+              "color": "#f1c40f"
+            },
+            {
+              "id": "stack-mb-containment-criticality",
+              "field": "criticality",
+              "label": "High",
+              "color": "#566573"
+            },
+            {
+              "id": "stack-mb-containment-responsible",
+              "field": "responsible",
+              "label": "Tech Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-containment-validation",
+              "field": "validation",
+              "label": "Inspection",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-containment-status",
+              "field": "status",
+              "label": "Degraded",
+              "color": "#f39c12"
+            }
+          ],
+          "stackCollapsed": true
+        },
+        {
+          "id": "mb-notification",
+          "label": "Regulatory reporting and community notification",
+          "notes": "RMP/SEVESO-style reporting and liaison with authorities as required.",
+          "escalationFactors": [],
+          "stack": [
+            {
+              "id": "stack-mb-notification-type",
+              "field": "type",
+              "label": "Reactive Human",
+              "color": "#3498db"
+            },
+            {
+              "id": "stack-mb-notification-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-mb-notification-criticality",
+              "field": "criticality",
+              "label": "Medium",
+              "color": "#7f8c8d"
+            },
+            {
+              "id": "stack-mb-notification-responsible",
+              "field": "responsible",
+              "label": "HSE Department",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-notification-validation",
+              "field": "validation",
+              "label": "Audit",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-notification-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    },
+    {
+      "id": "consequence-business",
+      "label": "Operational loss due to cold-chain interruption",
+      "mitigationBarriers": [
+        {
+          "id": "mb-erp",
+          "label": "Emergency response plan and qualified contractor standby",
+          "notes": "Ammonia-qualified emergency repair and product salvage / transfer plan.",
+          "escalationFactors": [
+            {
+              "id": "ef-contractor-gap",
+              "label": "Contractor availability or response time not assured",
+              "escalationBarriers": [
+                {
+                  "id": "eb-contractor-retainer",
+                  "label": "Pre-qualified contractor agreement and annual drill",
+                  "escalationFactors": [],
+                  "stack": [],
+                  "stackCollapsed": true
+                }
+              ]
+            }
+          ],
+          "stack": [
+            {
+              "id": "stack-mb-erp-type",
+              "field": "type",
+              "label": "Reactive Human",
+              "color": "#3498db"
+            },
+            {
+              "id": "stack-mb-erp-effectiveness",
+              "field": "effectiveness",
+              "label": "Good",
+              "color": "#27ae60"
+            },
+            {
+              "id": "stack-mb-erp-criticality",
+              "field": "criticality",
+              "label": "High",
+              "color": "#566573"
+            },
+            {
+              "id": "stack-mb-erp-responsible",
+              "field": "responsible",
+              "label": "Management",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-erp-validation",
+              "field": "validation",
+              "label": "Drills and Exercise",
+              "color": "#ffffff"
+            },
+            {
+              "id": "stack-mb-erp-status",
+              "field": "status",
+              "label": "Available",
+              "color": "#1e8449"
+            }
+          ],
+          "stackCollapsed": true
+        }
+      ]
+    }
+  ],
+  "view": {
+    "zoom": 1,
+    "panX": 0,
+    "panY": 0
+  },
+  "createdAt": "2026-06-19T00:00:00.000Z",
+  "updatedAt": "2026-06-19T12:05:10.306Z"
+}

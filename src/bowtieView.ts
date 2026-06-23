@@ -1,4 +1,4 @@
-import { Menu, Notice, TextFileView, WorkspaceLeaf, setIcon } from "obsidian";
+import { Menu, Notice, TextFileView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import { ExportImageModal } from "./exportImageModal";
 import { HelpModal } from "./helpModal";
 import type { BowtieExportViewport } from "./exportImage";
@@ -25,10 +25,13 @@ import {
 	cloneBowtie,
 	createBowtie,
 	createConsequence,
-	createEscalationFactor,
+	createDegradationChain,
+	createEscalationNode,
 	createThreat,
+	createTopEvent,
 	deserializeBowtie,
-	type EscalationFactor,
+	type DegradationChain,
+	type EscalationNode,
 	nodeRefKey,
 	type NodeRef,
 	serializeBowtie,
@@ -97,10 +100,14 @@ export class BowtieView extends TextFileView {
 	private isPanning = false;
 	private panStart = { x: 0, y: 0 };
 	private panOrigin = { x: 0, y: 0 };
+	private panPointerId: number | null = null;
+	private activePointers = new Map<number, { x: number; y: number }>();
+	private pinchLastDistance: number | null = null;
 	private saveTimeout: number | null = null;
 	private viewSaveTimeout: number | null = null;
 	private viewShellReady = false;
 	private panZoomReady = false;
+	private externalSyncReady = false;
 	private wheelRaf: number | null = null;
 	private wheelDeltaAccum = 0;
 	private wheelClient = { x: 0, y: 0 };
@@ -160,6 +167,7 @@ export class BowtieView extends TextFileView {
 		this.contentEl.empty();
 		this.viewShellReady = false;
 		this.panZoomReady = false;
+		this.externalSyncReady = false;
 		this.toolbarTitleEl = null;
 		this.undoBtn = null;
 		this.redoBtn = null;
@@ -180,9 +188,31 @@ export class BowtieView extends TextFileView {
 	private scheduleSave(): void {
 		if (this.saveTimeout !== null) window.clearTimeout(this.saveTimeout);
 		this.saveTimeout = window.setTimeout(() => {
+			this.saveTimeout = null;
 			this.bowtie = touchBowtie(this.bowtie);
 			this.requestSave();
 		}, 400);
+	}
+
+	private flushPendingSave(): void {
+		const hadPending =
+			this.saveTimeout !== null || this.viewSaveTimeout !== null;
+		if (this.viewSaveTimeout !== null) {
+			window.clearTimeout(this.viewSaveTimeout);
+			this.viewSaveTimeout = null;
+		}
+		if (this.saveTimeout !== null) {
+			window.clearTimeout(this.saveTimeout);
+			this.saveTimeout = null;
+		}
+		if (hadPending) {
+			this.bowtie = touchBowtie(this.bowtie);
+			this.requestSave();
+		}
+	}
+
+	async onClose(): Promise<void> {
+		this.flushPendingSave();
 	}
 
 	private resetHistory(): void {
@@ -214,21 +244,22 @@ export class BowtieView extends TextFileView {
 	private nodeRefExists(ref: NodeRef): boolean {
 		switch (ref.kind) {
 			case "hazard":
+				return this.bowtie.events.some((e) => e.id === ref.eventId);
 			case "topEvent":
-				return true;
+				return this.bowtie.events.some((e) => e.id === ref.eventId);
 			case "threat":
 				return this.bowtie.threats.some((t) => t.id === ref.threatId);
 			case "consequence":
 				return this.bowtie.consequences.some((c) => c.id === ref.consequenceId);
 			case "preventionBarrier":
 			case "mitigationBarrier":
+			case "transitionBarrier":
 				return this.findBarrier(ref) !== null;
-			case "escalationFactor":
-				return this.findEscalationFactor(ref) !== null;
-			case "escalationBarrier": {
-				const factor = this.findEscalationFactor(ref);
-				return factor?.escalationBarriers.some((eb) => eb.id === ref.escalationBarrierId) ?? false;
+			case "safeguard": {
+				return this.findSafeguard(ref) !== null;
 			}
+			case "degradationFactor":
+				return this.findDegradationChain(ref) !== null;
 		}
 	}
 
@@ -302,6 +333,7 @@ export class BowtieView extends TextFileView {
 		this.inspectorEl = this.contentEl.createDiv({ cls: "o-tie-inspector" });
 
 		this.setupPanZoom();
+		this.setupExternalSync();
 		this.viewShellReady = true;
 	}
 
@@ -341,6 +373,7 @@ export class BowtieView extends TextFileView {
 		const addGroup = this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-group" });
 		this.createToolbarBtn(addGroup, "+ Threat", () => this.addThreat(), { primary: true });
 		this.createToolbarBtn(addGroup, "+ Consequence", () => this.addConsequence(), { primary: true });
+		this.createToolbarBtn(addGroup, "+ Event", () => this.addTopEvent(), { primary: true });
 		this.createToolbarBtn(addGroup, "+ Barrier", () => this.addBarrierToSelection());
 
 		this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-separator" });
@@ -465,7 +498,11 @@ export class BowtieView extends TextFileView {
 
 		const actions = row.createDiv({ cls: "o-tie-inspector-actions" });
 
-		if (this.selectedRef.kind === "preventionBarrier" || this.selectedRef.kind === "mitigationBarrier") {
+		if (
+			this.selectedRef.kind === "preventionBarrier" ||
+			this.selectedRef.kind === "mitigationBarrier" ||
+			this.selectedRef.kind === "transitionBarrier"
+		) {
 			const stackBtn = actions.createEl("button", { text: "+ Stack row", cls: "mod-small" });
 			stackBtn.addEventListener("click", (e) => {
 				const rect = stackBtn.getBoundingClientRect();
@@ -474,20 +511,30 @@ export class BowtieView extends TextFileView {
 					this.selectedRef!
 				);
 			});
-			const escBtn = actions.createEl("button", { text: "+ Escalation factor", cls: "mod-small" });
-			escBtn.addEventListener("click", () => {
-				this.addEscalationFactor(this.selectedRef!);
+			const degBtn = actions.createEl("button", { text: "⚡ Degradation factor", cls: "mod-small" });
+			degBtn.addEventListener("click", () => {
+				this.addDegradationFactor(this.selectedRef!);
 			});
 		}
 
-		if (this.selectedRef.kind === "escalationFactor") {
-			const escBarBtn = actions.createEl("button", {
-				text: "+ Escalation barrier",
-				cls: "mod-small",
+		if (this.selectedRef.kind === "degradationFactor") {
+			const sgBtn = actions.createEl("button", { text: "+ Safeguard", cls: "mod-small" });
+			sgBtn.addEventListener("click", () => {
+				this.addSafeguard(this.selectedRef!);
 			});
-			escBarBtn.addEventListener("click", () => {
-				this.addEscalationBarrier(this.selectedRef!);
-			});
+		}
+
+		if (this.selectedRef.kind === "topEvent" && this.selectedRef.eventId) {
+			const eventIndex = this.bowtie.events.findIndex((e) => e.id === this.selectedRef!.eventId);
+			if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
+				const barBtn = actions.createEl("button", {
+					text: "+ Barrier to next event",
+					cls: "mod-cta mod-small",
+				});
+				barBtn.addEventListener("click", () => {
+					this.addTransitionBarrier(this.selectedRef!.eventId!);
+				});
+			}
 		}
 
 		if (this.selectedRef.kind === "threat") {
@@ -582,7 +629,9 @@ export class BowtieView extends TextFileView {
 		const el = wrap.createDiv({ cls: `o-tie-node o-tie-node-${node.kind}` });
 
 		const isBarrier =
-			node.kind === "preventionBarrier" || node.kind === "mitigationBarrier";
+			node.kind === "preventionBarrier" ||
+			node.kind === "mitigationBarrier" ||
+			node.kind === "transitionBarrier";
 		let labelEl: HTMLElement;
 
 		if (isBarrier) {
@@ -621,25 +670,38 @@ export class BowtieView extends TextFileView {
 			});
 		}
 
+		if (node.kind === "topEvent" && node.ref.eventId) {
+			const eventIndex = this.bowtie.events.findIndex((e) => e.id === node.ref.eventId);
+			if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
+				const addBar = wrap.createEl("button", { cls: "o-tie-node-add-barrier o-tie-plus-btn" });
+				addBar.setAttribute("aria-label", "Add barrier to next event");
+				addBar.addEventListener("mousedown", (e) => e.stopPropagation());
+				addBar.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.addTransitionBarrier(node.ref.eventId!);
+				});
+			}
+		}
+
 		if (isBarrier) {
-			const addEsc = wrap.createEl("button", { cls: "o-tie-node-add-escalation", text: "⚡" });
-			addEsc.setAttribute("aria-label", "Add escalation factor");
-			addEsc.addEventListener("mousedown", (e) => e.stopPropagation());
-			addEsc.addEventListener("click", (e) => {
+			const addDeg = wrap.createEl("button", { cls: "o-tie-node-add-escalation", text: "⚡" });
+			addDeg.setAttribute("aria-label", "Add degradation factor");
+			addDeg.addEventListener("mousedown", (e) => e.stopPropagation());
+			addDeg.addEventListener("click", (e) => {
 				e.stopPropagation();
-				this.addEscalationFactor(node.ref);
+				this.addDegradationFactor(node.ref);
 			});
 		}
 
-		if (node.kind === "escalationFactor") {
-			const addEscBar = wrap.createEl("button", {
+		if (node.kind === "degradationFactor") {
+			const addSg = wrap.createEl("button", {
 				cls: "o-tie-node-add-esc-barrier o-tie-plus-btn",
 			});
-			addEscBar.setAttribute("aria-label", "Add escalation barrier");
-			addEscBar.addEventListener("mousedown", (e) => e.stopPropagation());
-			addEscBar.addEventListener("click", (e) => {
+			addSg.setAttribute("aria-label", "Add safeguard");
+			addSg.addEventListener("mousedown", (e) => e.stopPropagation());
+			addSg.addEventListener("click", (e) => {
 				e.stopPropagation();
-				this.addEscalationBarrier(node.ref);
+				this.addSafeguard(node.ref);
 			});
 		}
 
@@ -1035,7 +1097,22 @@ export class BowtieView extends TextFileView {
 					.onClick(() => this.addMitigationBarrier(ref.consequenceId!))
 			);
 		}
-		if (ref.kind === "preventionBarrier" || ref.kind === "mitigationBarrier") {
+		if (ref.kind === "topEvent" && ref.eventId) {
+			const eventIndex = this.bowtie.events.findIndex((e) => e.id === ref.eventId);
+			if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
+				menu.addItem((item) =>
+					item
+						.setTitle("Add barrier to next event")
+						.setIcon("shield")
+						.onClick(() => this.addTransitionBarrier(ref.eventId!))
+				);
+			}
+		}
+		if (
+			ref.kind === "preventionBarrier" ||
+			ref.kind === "mitigationBarrier" ||
+			ref.kind === "transitionBarrier"
+		) {
 			menu.addItem((item) =>
 				item
 					.setTitle("Add stack row")
@@ -1043,15 +1120,15 @@ export class BowtieView extends TextFileView {
 					.onClick(() => this.showAddStackRowMenu(event, ref))
 			);
 			menu.addItem((item) =>
-				item.setTitle("Add escalation factor").setIcon("zap").onClick(() => this.addEscalationFactor(ref))
+				item
+					.setTitle("Add degradation factor")
+					.setIcon("zap")
+					.onClick(() => this.addDegradationFactor(ref))
 			);
 		}
-		if (ref.kind === "escalationFactor") {
+		if (ref.kind === "degradationFactor") {
 			menu.addItem((item) =>
-				item
-					.setTitle("Add escalation barrier")
-					.setIcon("shield")
-					.onClick(() => this.addEscalationBarrier(ref))
+				item.setTitle("Add safeguard").setIcon("shield").onClick(() => this.addSafeguard(ref))
 			);
 		}
 		menu.showAtPosition({ x: event.clientX, y: event.clientY });
@@ -1113,41 +1190,72 @@ export class BowtieView extends TextFileView {
 			menu.showAtMouseEvent(e);
 		});
 
-		this.registerDomEvent(this.containerEl_, "mousedown", (e) => {
+		this.registerDomEvent(this.containerEl_, "pointerdown", (e) => {
 			const target = e.target as HTMLElement;
-			if (
-				target.closest(".o-tie-node-wrap") ||
-				target.closest(".o-tie-lane-add") ||
-				target.closest("button")
-			) {
+			if (!this.isPanZoomTarget(target)) return;
+
+			this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+			if (this.activePointers.size === 2) {
+				this.endPan();
+				this.pinchLastDistance = this.pointerDistance();
 				return;
 			}
-			this.isPanning = true;
-			this.panStart = { x: e.clientX, y: e.clientY };
-			this.panOrigin = {
-				x: this.bowtie.view?.panX ?? 0,
-				y: this.bowtie.view?.panY ?? 0,
-			};
-			this.containerEl_.addClass("o-tie-panning");
-		});
 
-		this.registerDomEvent(window, "mousemove", (e) => {
-			if (!this.isPanning) return;
-			const dx = e.clientX - this.panStart.x;
-			const dy = e.clientY - this.panStart.y;
-			if (!this.bowtie.view) this.bowtie.view = { zoom: 1, panX: 0, panY: 0 };
-			this.bowtie.view.panX = this.panOrigin.x + dx;
-			this.bowtie.view.panY = this.panOrigin.y + dy;
-			this.applyTransform();
-		});
-
-		this.registerDomEvent(window, "mouseup", () => {
-			if (this.isPanning) {
-				this.isPanning = false;
-				this.containerEl_.removeClass("o-tie-panning");
-				this.scheduleViewSave();
+			if (this.activePointers.size === 1) {
+				this.panPointerId = e.pointerId;
+				this.pinchLastDistance = null;
+				this.containerEl_.setPointerCapture(e.pointerId);
+				this.startPan(e.clientX, e.clientY);
 			}
 		});
+
+		this.registerDomEvent(this.containerEl_, "pointermove", (e) => {
+			if (!this.activePointers.has(e.pointerId)) return;
+			this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+			if (this.activePointers.size >= 2) {
+				this.handlePinchZoom();
+				return;
+			}
+
+			if (this.isPanning && e.pointerId === this.panPointerId) {
+				this.updatePan(e.clientX, e.clientY);
+			}
+		});
+
+		const releasePointer = (e: PointerEvent): void => {
+			if (!this.activePointers.has(e.pointerId)) return;
+			this.activePointers.delete(e.pointerId);
+
+			if (this.containerEl_.hasPointerCapture(e.pointerId)) {
+				this.containerEl_.releasePointerCapture(e.pointerId);
+			}
+
+			if (this.activePointers.size < 2) {
+				this.pinchLastDistance = null;
+			}
+
+			if (e.pointerId === this.panPointerId) {
+				this.endPan();
+			}
+
+			if (this.activePointers.size === 1) {
+				const remaining = this.activePointers.entries().next().value as
+					| [number, { x: number; y: number }]
+					| undefined;
+				if (remaining) {
+					const [pointerId, point] = remaining;
+					this.panPointerId = pointerId;
+					this.pinchLastDistance = null;
+					this.containerEl_.setPointerCapture(pointerId);
+					this.startPan(point.x, point.y);
+				}
+			}
+		};
+
+		this.registerDomEvent(this.containerEl_, "pointerup", releasePointer);
+		this.registerDomEvent(this.containerEl_, "pointercancel", releasePointer);
 
 		this.registerDomEvent(
 			this.containerEl_,
@@ -1257,8 +1365,93 @@ export class BowtieView extends TextFileView {
 	private scheduleViewSave(): void {
 		if (this.viewSaveTimeout !== null) window.clearTimeout(this.viewSaveTimeout);
 		this.viewSaveTimeout = window.setTimeout(() => {
+			this.viewSaveTimeout = null;
 			this.scheduleSave();
 		}, 500);
+	}
+
+	private setupExternalSync(): void {
+		if (this.externalSyncReady) return;
+		this.externalSyncReady = true;
+
+		this.registerEvent(
+			this.app.vault.on("modify", (file) => {
+				if (!(file instanceof TFile) || file !== this.file) return;
+				if (this.saveTimeout !== null || this.viewSaveTimeout !== null) {
+					new Notice(
+						"O-tie: this bowtie was updated elsewhere. Close and reopen the file to load remote changes.",
+						6000
+					);
+					return;
+				}
+				void this.app.vault.read(file).then((data) => {
+					if (data !== this.getViewData()) {
+						this.setViewData(data, false);
+					}
+				});
+			})
+		);
+	}
+
+	private isPanZoomTarget(target: HTMLElement): boolean {
+		return !(
+			target.closest(".o-tie-node-wrap") ||
+			target.closest(".o-tie-lane-add") ||
+			target.closest("button")
+		);
+	}
+
+	private startPan(clientX: number, clientY: number): void {
+		this.isPanning = true;
+		this.panStart = { x: clientX, y: clientY };
+		this.panOrigin = {
+			x: this.bowtie.view?.panX ?? 0,
+			y: this.bowtie.view?.panY ?? 0,
+		};
+		this.containerEl_.addClass("o-tie-panning");
+	}
+
+	private updatePan(clientX: number, clientY: number): void {
+		if (!this.isPanning) return;
+		const dx = clientX - this.panStart.x;
+		const dy = clientY - this.panStart.y;
+		if (!this.bowtie.view) this.bowtie.view = { zoom: 1, panX: 0, panY: 0 };
+		this.bowtie.view.panX = this.panOrigin.x + dx;
+		this.bowtie.view.panY = this.panOrigin.y + dy;
+		this.applyTransform();
+	}
+
+	private endPan(): void {
+		if (!this.isPanning) return;
+		this.isPanning = false;
+		this.panPointerId = null;
+		this.containerEl_.removeClass("o-tie-panning");
+		this.scheduleViewSave();
+	}
+
+	private pointerDistance(): number {
+		const pts = Array.from(this.activePointers.values());
+		if (pts.length < 2) return 0;
+		return Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+	}
+
+	private pointerMidpoint(): { x: number; y: number } {
+		const pts = Array.from(this.activePointers.values());
+		return {
+			x: (pts[0].x + pts[1].x) / 2,
+			y: (pts[0].y + pts[1].y) / 2,
+		};
+	}
+
+	private handlePinchZoom(): void {
+		const distance = this.pointerDistance();
+		if (distance <= 0) return;
+		if (this.pinchLastDistance !== null && this.pinchLastDistance > 0) {
+			const factor = distance / this.pinchLastDistance;
+			const mid = this.pointerMidpoint();
+			this.zoomAt(mid.x, mid.y, factor);
+		}
+		this.pinchLastDistance = distance;
 	}
 
 	private zoomAt(clientX: number, clientY: number, factor: number): void {
@@ -1321,6 +1514,11 @@ export class BowtieView extends TextFileView {
 	}
 
 	private forEachBarrier(callback: (barrier: Barrier) => void): void {
+		for (const event of this.bowtie.events) {
+			for (const barrier of event.transitionBarriers) {
+				callback(barrier);
+			}
+		}
 		for (const threat of this.bowtie.threats) {
 			for (const barrier of threat.preventionBarriers) {
 				callback(barrier);
@@ -1329,11 +1527,6 @@ export class BowtieView extends TextFileView {
 		for (const consequence of this.bowtie.consequences) {
 			for (const barrier of consequence.mitigationBarriers) {
 				callback(barrier);
-				for (const factor of barrier.escalationFactors) {
-					for (const escBarrier of factor.escalationBarriers) {
-						callback(escBarrier);
-					}
-				}
 			}
 		}
 	}
@@ -1394,6 +1587,14 @@ export class BowtieView extends TextFileView {
 		this.scheduleSave();
 	}
 
+	private addTopEvent(): void {
+		this.commitEdit();
+		this.bowtie.events.push(createTopEvent("New event"));
+		this.render();
+		this.scheduleSave();
+		new Notice("Top event added.");
+	}
+
 	private addBarrierToSelection(): void {
 		if (this.selectedRef?.kind === "threat" && this.selectedRef.threatId) {
 			this.addPreventionBarrier(this.selectedRef.threatId);
@@ -1403,6 +1604,13 @@ export class BowtieView extends TextFileView {
 			this.addMitigationBarrier(this.selectedRef.consequenceId);
 			return;
 		}
+		if (this.selectedRef?.kind === "topEvent" && this.selectedRef.eventId) {
+			const eventIndex = this.bowtie.events.findIndex((e) => e.id === this.selectedRef!.eventId);
+			if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
+				this.addTransitionBarrier(this.selectedRef.eventId);
+				return;
+			}
+		}
 		if (this.bowtie.threats.length > 0) {
 			this.addPreventionBarrier(this.bowtie.threats[0].id);
 			return;
@@ -1411,7 +1619,13 @@ export class BowtieView extends TextFileView {
 			this.addMitigationBarrier(this.bowtie.consequences[0].id);
 			return;
 		}
-		new Notice("Add a threat or consequence first, then add barriers.");
+		const lastEvent = this.bowtie.events[this.bowtie.events.length - 1];
+		const prevEvent = this.bowtie.events[this.bowtie.events.length - 2];
+		if (prevEvent && lastEvent) {
+			this.addTransitionBarrier(prevEvent.id);
+			return;
+		}
+		new Notice("Add a threat, consequence, or event first, then add barriers.");
 	}
 
 	private addPreventionBarrier(threatId: string): void {
@@ -1436,9 +1650,26 @@ export class BowtieView extends TextFileView {
 		new Notice("Mitigation barrier added.");
 	}
 
+	private addTransitionBarrier(eventId: string): void {
+		const event = this.bowtie.events.find((e) => e.id === eventId);
+		if (!event) return;
+		const eventIndex = this.bowtie.events.findIndex((e) => e.id === eventId);
+		if (eventIndex < 0 || eventIndex >= this.bowtie.events.length - 1) {
+			new Notice("Barriers can only be added between consecutive events.");
+			return;
+		}
+		this.commitEdit();
+		event.transitionBarriers.push(createBarrier("New barrier"));
+		this.selectedRef = { kind: "topEvent", eventId };
+		this.render();
+		this.scheduleSave();
+		new Notice("Barrier added between events.");
+	}
+
 	private renderLaneAddButtons(layout: import("./layout").LayoutResult): void {
-		const topEvent = layout.nodes.find((n) => n.kind === "topEvent");
-		if (!topEvent) return;
+		const firstTopEvent = layout.nodes.find((n) => n.kind === "topEvent");
+		const lastTopEvent = [...layout.nodes].reverse().find((n) => n.kind === "topEvent");
+		if (!firstTopEvent || !lastTopEvent) return;
 
 		for (const threat of this.bowtie.threats) {
 			const threatNode = layout.nodes.find(
@@ -1451,11 +1682,34 @@ export class BowtieView extends TextFileView {
 				(n) => n.kind === "preventionBarrier" && n.ref.threatId === threat.id
 			);
 			const fromNode = lastBarrier ?? threatNode;
-			const pos = this.laneAddPosition(fromNode, topEvent, layout);
+			const pos = this.laneAddPosition(fromNode, firstTopEvent, layout);
 			if (!pos) continue;
 
 			this.createLaneAddButton(pos.x, pos.y, "Add prevention barrier", () =>
 				this.addPreventionBarrier(threat.id)
+			);
+		}
+
+		for (let i = 0; i < this.bowtie.events.length - 1; i++) {
+			const event = this.bowtie.events[i];
+			const fromEventNode = layout.nodes.find(
+				(n) => n.kind === "topEvent" && n.ref.eventId === event.id
+			);
+			const toEventNode = layout.nodes.find(
+				(n) => n.kind === "topEvent" && n.ref.eventId === this.bowtie.events[i + 1].id
+			);
+			if (!fromEventNode || !toEventNode) continue;
+
+			const lastTransition = this.findLastBarrierInLane(
+				layout,
+				(n) => n.kind === "transitionBarrier" && n.ref.eventId === event.id
+			);
+			const fromNode = lastTransition ?? fromEventNode;
+			const pos = this.laneAddPosition(fromNode, toEventNode, layout);
+			if (!pos) continue;
+
+			this.createLaneAddButton(pos.x, pos.y, "Add barrier between events", () =>
+				this.addTransitionBarrier(event.id)
 			);
 		}
 
@@ -1472,7 +1726,7 @@ export class BowtieView extends TextFileView {
 					n.ref.consequenceId === consequence.id
 			);
 
-			const fromNode = lastMitigation ?? topEvent;
+			const fromNode = lastMitigation ?? lastTopEvent;
 			const pos = this.laneAddPosition(fromNode, consNode, layout);
 			if (!pos) continue;
 
@@ -1545,37 +1799,48 @@ export class BowtieView extends TextFileView {
 		btn.setCssStyles({ left: `${x}px`, top: `${y}px` });
 		btn.setAttribute("aria-label", label);
 		btn.addEventListener("mousedown", (e) => e.stopPropagation());
+		btn.addEventListener("pointerdown", (e) => e.stopPropagation());
 		btn.addEventListener("click", (e) => {
 			e.stopPropagation();
 			onClick();
 		});
 	}
 
-	private addEscalationFactor(ref: NodeRef): void {
+	private addDegradationFactor(ref: NodeRef): void {
 		const barrier = this.findBarrier(ref);
 		if (!barrier) return;
 		this.commitEdit();
-		barrier.escalationFactors.push(createEscalationFactor("Escalation factor"));
+		barrier.degradationChains.push(createDegradationChain("Degradation factor"));
 		this.render();
 		this.scheduleSave();
 	}
 
-	private addEscalationBarrier(ref: NodeRef): void {
-		const factor = this.findEscalationFactor(ref);
-		if (!factor) return;
+	private addSafeguard(ref: NodeRef): void {
+		const chain = this.findDegradationChain(ref);
+		if (!chain) return;
 		this.commitEdit();
-		factor.escalationBarriers.push(createBarrier("Escalation barrier"));
+		chain.safeguards.push(createEscalationNode("Safeguard"));
 		this.render();
 		this.scheduleSave();
 	}
 
-	private findEscalationFactor(ref: NodeRef): EscalationFactor | null {
-		if (!ref.escalationId) return null;
+	private findDegradationChain(ref: NodeRef): DegradationChain | null {
 		const barrier = this.findBarrier(ref);
-		return barrier?.escalationFactors.find((f) => f.id === ref.escalationId) ?? null;
+		if (!barrier || !ref.chainId) return null;
+		return barrier.degradationChains.find((c) => c.id === ref.chainId) ?? null;
+	}
+
+	private findSafeguard(ref: NodeRef): EscalationNode | null {
+		const chain = this.findDegradationChain(ref);
+		if (!chain || !ref.safeguardId) return null;
+		return chain.safeguards.find((sg) => sg.id === ref.safeguardId) ?? null;
 	}
 
 	private findBarrier(ref: NodeRef): Barrier | null {
+		if (ref.eventId && ref.barrierId) {
+			const event = this.bowtie.events.find((e) => e.id === ref.eventId);
+			return event?.transitionBarriers.find((b) => b.id === ref.barrierId) ?? null;
+		}
 		if (ref.threatId && ref.barrierId) {
 			const threat = this.bowtie.threats.find((t) => t.id === ref.threatId);
 			return threat?.preventionBarriers.find((b) => b.id === ref.barrierId) ?? null;
@@ -1587,12 +1852,21 @@ export class BowtieView extends TextFileView {
 		return null;
 	}
 
+	private findTopEvent(ref: NodeRef) {
+		if (!ref.eventId) return null;
+		return this.bowtie.events.find((e) => e.id === ref.eventId) ?? null;
+	}
+
 	private getNodeLabel(ref: NodeRef): string {
 		switch (ref.kind) {
-			case "hazard":
-				return this.bowtie.hazard;
-			case "topEvent":
-				return this.bowtie.topEvent;
+			case "hazard": {
+				const event = this.findTopEvent(ref);
+				return event?.hazard ?? "";
+			}
+			case "topEvent": {
+				const event = this.findTopEvent(ref);
+				return event?.label ?? "";
+			}
 			case "threat": {
 				const t = this.bowtie.threats.find((x) => x.id === ref.threatId);
 				return t?.label ?? "";
@@ -1602,20 +1876,18 @@ export class BowtieView extends TextFileView {
 				return c?.label ?? "";
 			}
 			case "preventionBarrier":
-			case "mitigationBarrier": {
+			case "mitigationBarrier":
+			case "transitionBarrier": {
 				const b = this.findBarrier(ref);
 				return b?.label ?? "";
 			}
-			case "escalationFactor": {
-				const b = this.findBarrier(ref);
-				const f = b?.escalationFactors.find((x) => x.id === ref.escalationId);
-				return f?.label ?? "";
+			case "safeguard": {
+				const sg = this.findSafeguard(ref);
+				return sg?.label ?? "";
 			}
-			case "escalationBarrier": {
-				const b = this.findBarrier(ref);
-				const f = b?.escalationFactors.find((x) => x.id === ref.escalationId);
-				const escB = f?.escalationBarriers.find((x) => x.id === ref.escalationBarrierId);
-				return escB?.label ?? "";
+			case "degradationFactor": {
+				const chain = this.findDegradationChain(ref);
+				return chain?.degradationFactor.label ?? "";
 			}
 		}
 	}
@@ -1628,14 +1900,19 @@ export class BowtieView extends TextFileView {
 			consequence: "Consequence",
 			preventionBarrier: "Prevention Barrier",
 			mitigationBarrier: "Mitigation Barrier",
-			escalationFactor: "Escalation Factor",
-			escalationBarrier: "Escalation Barrier",
+			transitionBarrier: "Barrier",
+			safeguard: "Safeguard",
+			degradationFactor: "Degradation Factor",
 		};
 		return map[ref.kind] ?? ref.kind;
 	}
 
 	private getNodeNotes(ref: NodeRef): string {
 		switch (ref.kind) {
+			case "topEvent": {
+				const event = this.findTopEvent(ref);
+				return event?.notes ?? "";
+			}
 			case "threat": {
 				const t = this.bowtie.threats.find((x) => x.id === ref.threatId);
 				return t?.notes ?? "";
@@ -1645,14 +1922,18 @@ export class BowtieView extends TextFileView {
 				return c?.notes ?? "";
 			}
 			case "preventionBarrier":
-			case "mitigationBarrier": {
+			case "mitigationBarrier":
+			case "transitionBarrier": {
 				const b = this.findBarrier(ref);
 				return b?.notes ?? "";
 			}
-			case "escalationFactor": {
-				const b = this.findBarrier(ref);
-				const f = b?.escalationFactors.find((x) => x.id === ref.escalationId);
-				return f?.notes ?? "";
+			case "safeguard": {
+				const sg = this.findSafeguard(ref);
+				return sg?.notes ?? "";
+			}
+			case "degradationFactor": {
+				const chain = this.findDegradationChain(ref);
+				return chain?.degradationFactor.notes ?? "";
 			}
 		}
 		return "";
@@ -1660,12 +1941,16 @@ export class BowtieView extends TextFileView {
 
 	private setNodeLabel(ref: NodeRef, label: string): void {
 		switch (ref.kind) {
-			case "hazard":
-				this.bowtie.hazard = label;
+			case "hazard": {
+				const event = this.findTopEvent(ref);
+				if (event) event.hazard = label;
 				break;
-			case "topEvent":
-				this.bowtie.topEvent = label;
+			}
+			case "topEvent": {
+				const event = this.findTopEvent(ref);
+				if (event) event.label = label;
 				break;
+			}
 			case "threat": {
 				const t = this.bowtie.threats.find((x) => x.id === ref.threatId);
 				if (t) t.label = label;
@@ -1677,22 +1962,20 @@ export class BowtieView extends TextFileView {
 				break;
 			}
 			case "preventionBarrier":
-			case "mitigationBarrier": {
+			case "mitigationBarrier":
+			case "transitionBarrier": {
 				const b = this.findBarrier(ref);
 				if (b) b.label = label;
 				break;
 			}
-			case "escalationFactor": {
-				const b = this.findBarrier(ref);
-				const f = b?.escalationFactors.find((x) => x.id === ref.escalationId);
-				if (f) f.label = label;
+			case "safeguard": {
+				const sg = this.findSafeguard(ref);
+				if (sg) sg.label = label;
 				break;
 			}
-			case "escalationBarrier": {
-				const b = this.findBarrier(ref);
-				const f = b?.escalationFactors.find((x) => x.id === ref.escalationId);
-				const escB = f?.escalationBarriers.find((x) => x.id === ref.escalationBarrierId);
-				if (escB) escB.label = label;
+			case "degradationFactor": {
+				const chain = this.findDegradationChain(ref);
+				if (chain) chain.degradationFactor.label = label;
 				break;
 			}
 		}
@@ -1700,6 +1983,11 @@ export class BowtieView extends TextFileView {
 
 	private setNodeNotes(ref: NodeRef, notes: string): void {
 		switch (ref.kind) {
+			case "topEvent": {
+				const event = this.findTopEvent(ref);
+				if (event) event.notes = notes;
+				break;
+			}
 			case "threat": {
 				const t = this.bowtie.threats.find((x) => x.id === ref.threatId);
 				if (t) t.notes = notes;
@@ -1711,15 +1999,20 @@ export class BowtieView extends TextFileView {
 				break;
 			}
 			case "preventionBarrier":
-			case "mitigationBarrier": {
+			case "mitigationBarrier":
+			case "transitionBarrier": {
 				const b = this.findBarrier(ref);
 				if (b) b.notes = notes;
 				break;
 			}
-			case "escalationFactor": {
-				const b = this.findBarrier(ref);
-				const f = b?.escalationFactors.find((x) => x.id === ref.escalationId);
-				if (f) f.notes = notes;
+			case "safeguard": {
+				const sg = this.findSafeguard(ref);
+				if (sg) sg.notes = notes;
+				break;
+			}
+			case "degradationFactor": {
+				const chain = this.findDegradationChain(ref);
+				if (chain) chain.degradationFactor.notes = notes;
 				break;
 			}
 		}
@@ -1728,12 +2021,29 @@ export class BowtieView extends TextFileView {
 	private deleteNode(ref: NodeRef): void {
 		this.commitEdit();
 		switch (ref.kind) {
-			case "hazard":
-				this.bowtie.hazard = "";
+			case "hazard": {
+				const event = this.findTopEvent(ref);
+				if (event) event.hazard = "";
 				break;
-			case "topEvent":
-				this.bowtie.topEvent = "";
+			}
+			case "topEvent": {
+				if (this.bowtie.events.length <= 1) {
+					const event = this.findTopEvent(ref);
+					if (event) event.label = "";
+					break;
+				}
+				this.bowtie.events = this.bowtie.events.filter((e) => e.id !== ref.eventId);
 				break;
+			}
+			case "transitionBarrier": {
+				const event = this.bowtie.events.find((e) => e.id === ref.eventId);
+				if (event) {
+					event.transitionBarriers = event.transitionBarriers.filter(
+						(b) => b.id !== ref.barrierId
+					);
+				}
+				break;
+			}
 			case "threat":
 				this.bowtie.threats = this.bowtie.threats.filter((t) => t.id !== ref.threatId);
 				break;
@@ -1754,19 +2064,18 @@ export class BowtieView extends TextFileView {
 				}
 				break;
 			}
-			case "escalationFactor": {
-				const b = this.findBarrier(ref);
-				if (b) {
-					b.escalationFactors = b.escalationFactors.filter((f) => f.id !== ref.escalationId);
+			case "safeguard": {
+				const chain = this.findDegradationChain(ref);
+				if (chain) {
+					chain.safeguards = chain.safeguards.filter((sg) => sg.id !== ref.safeguardId);
 				}
 				break;
 			}
-			case "escalationBarrier": {
-				const b = this.findBarrier(ref);
-				const f = b?.escalationFactors.find((x) => x.id === ref.escalationId);
-				if (f) {
-					f.escalationBarriers = f.escalationBarriers.filter(
-						(eb) => eb.id !== ref.escalationBarrierId
+			case "degradationFactor": {
+				const barrier = this.findBarrier(ref);
+				if (barrier && ref.chainId) {
+					barrier.degradationChains = barrier.degradationChains.filter(
+						(c) => c.id !== ref.chainId
 					);
 				}
 				break;

@@ -2,6 +2,19 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.3] — 2026-06-23
+
+### Fixed
+
+- **Mobile + buttons** — Lane and node add controls keep a circular shape on phone and tablet by overriding mobile button min-height and enforcing a 1:1 aspect ratio.
+- **Mobile pan and zoom** — Canvas navigation now uses pointer events: one finger to pan, two fingers to pinch zoom (toolbar +/− still works as a fallback).
+
+### Improved
+
+- **Obsidian Sync** — Pending edits flush when the editor closes so changes reach disk before switching devices. Remote file updates reload automatically when there are no unsaved local edits. Help documents the Obsidian Sync settings required for `.bowtie` files.
+
+---
+
 ## [1.0.2] — 2026-06-19
 
 ### Fixed

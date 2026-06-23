@@ -1,4 +1,5 @@
-import type { Barrier, Bowtie, Consequence, Threat } from "./model";
+import type { Barrier, Bowtie, Consequence, Threat, TopEvent } from "./model";
+import { hasSafeguardChain } from "./model";
 import type { NodeKind, NodeRef } from "./model";
 
 export interface LayoutConfig {
@@ -14,6 +15,7 @@ export interface LayoutConfig {
 	columnGap: number;
 	rowGap: number;
 	barrierGap: number;
+	degradationChainGap: number;
 	escalationOffsetY: number;
 	padding: number;
 }
@@ -31,6 +33,7 @@ export const DEFAULT_LAYOUT: LayoutConfig = {
 	columnGap: 100,
 	rowGap: 48,
 	barrierGap: 24,
+	degradationChainGap: 36,
 	escalationOffsetY: 70,
 	padding: 80,
 };
@@ -140,7 +143,7 @@ export interface EdgeArrow {
 export interface EdgePath {
 	id: string;
 	path: string;
-	kind: "main" | "hazard" | "escalation";
+	kind: "main" | "hazard" | "safeguard" | "degradation";
 	fromRef: NodeRef;
 	toRef: NodeRef;
 	arrow: EdgeArrow;
@@ -152,21 +155,6 @@ export interface LayoutResult {
 	bounds: { width: number; height: number };
 }
 
-function placeBarriersInLane(
-	startX: number,
-	laneWidth: number,
-	count: number,
-	barrierWidth: number,
-	barrierGap: number
-): number[] {
-	if (count === 0) return [];
-	const usedWidth = count * barrierWidth + Math.max(0, count - 1) * barrierGap;
-	const offset = (laneWidth - usedWidth) / 2;
-	return Array.from(
-		{ length: count },
-		(_, i) => startX + offset + i * (barrierWidth + barrierGap)
-	);
-}
 
 function nodeRight(node: PositionedNode): { x: number; y: number } {
 	return { x: node.x + node.width, y: node.y + node.height / 2 };
@@ -304,37 +292,87 @@ function makeLineEdge(
 	};
 }
 
-function escalationFactorGap(layout: LayoutConfig): number {
-	return layout.rowGap * 0.35;
+function degradationChainGap(layout: LayoutConfig): number {
+	return layout.degradationChainGap;
 }
 
-function escalationColumnHeight(barrier: Barrier, layout: LayoutConfig): number {
-	const factors = barrier.escalationFactors;
-	if (factors.length === 0) return 0;
+function degradationChainsFootprint(barrier: Barrier, layout: LayoutConfig): number {
+	if (!hasSafeguardChain(barrier)) return layout.barrierWidth;
+	const chainCount = barrier.degradationChains.length;
+	const chainGap = degradationChainGap(layout);
+	return chainCount * layout.escalationWidth + Math.max(0, chainCount - 1) * chainGap;
+}
 
-	const factorGap = escalationFactorGap(layout);
+function barrierSlotWidth(barrier: Barrier, layout: LayoutConfig): number {
+	const footprint = degradationChainsFootprint(barrier, layout);
+	return Math.max(layout.barrierWidth, footprint + 16);
+}
+
+function barriersLaneWidth(barriers: Barrier[], layout: LayoutConfig): number {
+	if (barriers.length === 0) return 0;
+	const slots = barriers.map((b) => barrierSlotWidth(b, layout));
+	return slots.reduce((sum, w) => sum + w, 0) + Math.max(0, barriers.length - 1) * layout.barrierGap;
+}
+
+interface BarrierSlot {
+	x: number;
+	slotWidth: number;
+}
+
+function layoutBarrierSlots(
+	startX: number,
+	laneWidth: number,
+	barriers: Barrier[],
+	layout: LayoutConfig
+): BarrierSlot[] {
+	if (barriers.length === 0) return [];
+	const slotWidths = barriers.map((b) => barrierSlotWidth(b, layout));
+	const usedWidth =
+		slotWidths.reduce((sum, w) => sum + w, 0) +
+		Math.max(0, barriers.length - 1) * layout.barrierGap;
+	let slotStart = startX + (laneWidth - usedWidth) / 2;
+	const result: BarrierSlot[] = [];
+	for (const slotWidth of slotWidths) {
+		result.push({
+			x: slotStart + (slotWidth - layout.barrierWidth) / 2,
+			slotWidth,
+		});
+		slotStart += slotWidth + layout.barrierGap;
+	}
+	return result;
+}
+
+function degradationChainHeight(chain: import("./model").DegradationChain, layout: LayoutConfig): number {
 	const escGap = 12;
 	let height = 0;
 
-	factors.forEach((factor, factorIndex) => {
-		if (factorIndex > 0) height += factorGap;
-		height += escalationNodeHeight(
-			factor.label || "Escalation",
+	chain.safeguards.forEach((safeguard, safeguardIndex) => {
+		height +=
+			(safeguardIndex === 0 ? layout.rowGap * 0.5 : escGap) +
+			escalationNodeHeight(
+				safeguard.label || "Safeguard",
+				layout.escalationWidth,
+				layout.escalationHeight
+			);
+	});
+	height +=
+		(chain.safeguards.length === 0 ? layout.rowGap * 0.5 : escGap) +
+		escalationNodeHeight(
+			chain.degradationFactor.label || "Degradation",
 			layout.escalationWidth,
 			layout.escalationHeight
 		);
-		factor.escalationBarriers.forEach((escBarrier, escIndex) => {
-			height +=
-				(escIndex === 0 ? layout.rowGap * 0.5 : escGap) +
-				escalationNodeHeight(
-					escBarrier.label || "Esc. Barrier",
-					layout.escalationWidth,
-					layout.escalationHeight
-				);
-		});
-	});
+	return height;
+}
 
-	return layout.escalationOffsetY * ESCALATION_GAP_FACTOR + height;
+function escalationColumnHeight(barrier: Barrier, layout: LayoutConfig): number {
+	if (!hasSafeguardChain(barrier)) return 0;
+
+	const maxChainHeight = Math.max(
+		...barrier.degradationChains.map((chain) => degradationChainHeight(chain, layout))
+	);
+
+	return layout.escalationOffsetY * ESCALATION_GAP_FACTOR + maxChainHeight;
 }
 
 function escalationExtraForBarriers(barriers: Barrier[], layout: LayoutConfig): number {
@@ -398,6 +436,28 @@ function computeRowYPositions(heights: number[], contentTop: number, rowGap: num
 	return positions;
 }
 
+function pushChainEdges(
+	chain: PositionedNode[],
+	edges: EdgePath[],
+	idSuffix: string
+): void {
+	for (let i = 0; i < chain.length - 1; i++) {
+		const from = chain[i];
+		const to = chain[i + 1];
+		const p1 = nodeRight(from);
+		const p2 = nodeLeft(to);
+		const edge = makeBezierEdge(p1.x, p1.y, p2.x, p2.y);
+		edges.push({
+			id: `edge-${from.ref.kind}-${to.ref.kind}-${i}${idSuffix}`,
+			path: edge.path,
+			kind: "main",
+			fromRef: from.ref,
+			toRef: to.ref,
+			arrow: edge.arrow,
+		});
+	}
+}
+
 export function layoutBowtie(bowtie: Bowtie, layout: LayoutConfig = DEFAULT_LAYOUT): LayoutResult {
 	const nodes: PositionedNode[] = [];
 	const edges: EdgePath[] = [];
@@ -407,11 +467,15 @@ export function layoutBowtie(bowtie: Bowtie, layout: LayoutConfig = DEFAULT_LAYO
 
 	const maxBarriersLeft = Math.max(
 		0,
-		...bowtie.threats.map((t) => t.preventionBarriers.length)
+		...bowtie.threats.map((t) => barriersLaneWidth(t.preventionBarriers, layout))
 	);
 	const maxBarriersRight = Math.max(
 		0,
-		...bowtie.consequences.map((c) => c.mitigationBarriers.length)
+		...bowtie.consequences.map((c) => barriersLaneWidth(c.mitigationBarriers, layout))
+	);
+	const maxTransitionLaneWidth = Math.max(
+		0,
+		...bowtie.events.slice(0, -1).map((e) => barriersLaneWidth(e.transitionBarriers, layout))
 	);
 
 	const threatColX = layout.padding;
@@ -421,59 +485,132 @@ export function layoutBowtie(bowtie: Bowtie, layout: LayoutConfig = DEFAULT_LAYO
 		layout.padding +
 		layout.nodeWidth +
 		layout.columnGap +
-		maxBarriersLeft * (layout.barrierWidth + layout.barrierGap);
+		maxBarriersLeft;
 
-	const centerX = preventionEndX + layout.columnGap * 0.5;
 	const topEventSize = Math.max(layout.nodeWidth, layout.nodeHeight);
+	const firstEventX = preventionEndX + layout.columnGap * 0.5;
 
-	const mitigationStartX = centerX + topEventSize + layout.columnGap * 0.5;
-	const consequenceColX =
-		mitigationStartX +
-		maxBarriersRight * (layout.barrierWidth + layout.barrierGap) +
-		layout.columnGap;
+	const eventPositions: number[] = [];
+	const transitionLanes: { startX: number; endX: number; event: TopEvent }[] = [];
+	let eventX = firstEventX;
 
-	const hazardH = nodeBoxHeight(
-		bowtie.hazard || "Hazard",
-		layout.nodeWidth,
-		layout.hazardHeight
-	);
-	const hazardNode: PositionedNode = {
-		ref: { kind: "hazard" },
-		kind: "hazard",
-		label: bowtie.hazard || "Hazard",
-		subtitle: "Hazard",
-		x: centerX,
-		y: centerY - topEventSize / 2 - hazardH - layout.rowGap,
-		width: layout.nodeWidth,
-		height: hazardH,
-	};
-	nodes.push(hazardNode);
+	for (let i = 0; i < bowtie.events.length; i++) {
+		eventPositions.push(eventX);
+		eventX += topEventSize;
 
-	const topEventNode: PositionedNode = {
-		ref: { kind: "topEvent" },
-		kind: "topEvent",
-		label: bowtie.topEvent || "Top Event",
-		subtitle: "Top Event",
-		x: centerX,
-		y: centerY - topEventSize / 2,
-		width: topEventSize,
-		height: topEventSize,
-	};
-	nodes.push(topEventNode);
+		if (i < bowtie.events.length - 1) {
+			const transitionStartX = eventX + layout.columnGap * 0.5;
+			const transitionEndX = transitionStartX + layout.columnGap + maxTransitionLaneWidth;
+			transitionLanes.push({
+				startX: transitionStartX,
+				endX: transitionEndX,
+				event: bowtie.events[i],
+			});
+			eventX = transitionEndX + layout.columnGap * 0.5;
+		}
+	}
 
-	{
+	const lastEventX = eventPositions[eventPositions.length - 1] ?? firstEventX;
+	const mitigationStartX = lastEventX + topEventSize + layout.columnGap * 0.5;
+	const consequenceColX = mitigationStartX + maxBarriersRight + layout.columnGap;
+
+	const topEventNodes: PositionedNode[] = bowtie.events.map((event, index) => {
+		const eventNode: PositionedNode = {
+			ref: { kind: "topEvent", eventId: event.id },
+			kind: "topEvent",
+			label: event.label || "Top Event",
+			subtitle: "Top Event",
+			x: eventPositions[index],
+			y: centerY - topEventSize / 2,
+			width: topEventSize,
+			height: topEventSize,
+		};
+		nodes.push(eventNode);
+		return eventNode;
+	});
+
+	bowtie.events.forEach((event, index) => {
+		const eventNode = topEventNodes[index];
+		if (!eventNode) return;
+
+		const hazardH = nodeBoxHeight(
+			event.hazard || "Hazard",
+			layout.nodeWidth,
+			layout.hazardHeight
+		);
+		const hazardNode: PositionedNode = {
+			ref: { kind: "hazard", eventId: event.id },
+			kind: "hazard",
+			label: event.hazard || "Hazard",
+			subtitle: "Hazard",
+			x: eventPositions[index],
+			y: centerY - topEventSize / 2 - hazardH - layout.rowGap,
+			width: layout.nodeWidth,
+			height: hazardH,
+		};
+		nodes.push(hazardNode);
+
 		const from = nodeBottom(hazardNode);
-		const to = nodeTop(topEventNode);
+		const to = nodeTop(eventNode);
 		const edge = makeLineEdge(from.x, from.y, to.x, to.y);
 		edges.push({
-			id: "hazard-top",
+			id: `hazard-top-${event.id}`,
 			path: edge.path,
 			kind: "hazard",
 			fromRef: hazardNode.ref,
-			toRef: topEventNode.ref,
+			toRef: eventNode.ref,
 			arrow: edge.arrow,
 		});
-	}
+	});
+
+	const firstTopEventNode = topEventNodes[0];
+
+	transitionLanes.forEach((lane, laneIndex) => {
+		const fromEventNode = topEventNodes[laneIndex];
+		const toEventNode = topEventNodes[laneIndex + 1];
+		if (!fromEventNode || !toEventNode) return;
+
+		const chain: PositionedNode[] = [fromEventNode];
+		const laneWidth = lane.endX - lane.startX;
+		const transitionSlots = layoutBarrierSlots(
+			lane.startX,
+			laneWidth,
+			lane.event.transitionBarriers,
+			layout
+		);
+		const y = centerY - topEventSize / 2 + (topEventSize - layout.barrierHeaderHeight) / 2;
+
+		lane.event.transitionBarriers.forEach((barrier, barrierIndex) => {
+			const slot = transitionSlots[barrierIndex];
+			if (!slot) return;
+			const bx = slot.x;
+			const barrierHeight = barrierRenderHeight(barrier, layout);
+			const barrierNode: PositionedNode = {
+				ref: {
+					kind: "transitionBarrier",
+					eventId: lane.event.id,
+					barrierId: barrier.id,
+				},
+				kind: "transitionBarrier",
+				label: barrier.label || "Barrier",
+				subtitle: "Barrier",
+				x: bx,
+				y,
+				width: layout.barrierWidth,
+				height: barrierHeight,
+			};
+			nodes.push(barrierNode);
+			chain.push(barrierNode);
+			layoutEscalation(barrier, barrierNode, nodes, edges, layout, {
+				eventId: lane.event.id,
+			});
+		});
+
+		chain.push(toEventNode);
+		pushChainEdges(chain, edges, `-trans-${laneIndex}`);
+	});
+
+	const lastTopEventNode = topEventNodes[topEventNodes.length - 1];
 
 	const contentTop = layout.padding;
 	const threatRowHeights = bowtie.threats.map((t) => threatRowHeight(t, layout));
@@ -497,18 +634,18 @@ export function layoutBowtie(bowtie: Bowtie, layout: LayoutConfig = DEFAULT_LAYO
 		nodes.push(threatNode);
 
 		const chain: PositionedNode[] = [threatNode];
-		const barrierCount = threat.preventionBarriers.length;
 		const laneWidth = preventionEndX - preventionStartX;
-		const preventionPositions = placeBarriersInLane(
+		const preventionSlots = layoutBarrierSlots(
 			preventionStartX,
 			laneWidth,
-			barrierCount,
-			layout.barrierWidth,
-			layout.barrierGap
+			threat.preventionBarriers,
+			layout
 		);
 
 		threat.preventionBarriers.forEach((barrier, barrierIndex) => {
-			const bx = preventionPositions[barrierIndex];
+			const slot = preventionSlots[barrierIndex];
+			if (!slot) return;
+			const bx = slot.x;
 			const barrierHeight = barrierRenderHeight(barrier, layout);
 			const barrierNode: PositionedNode = {
 				ref: {
@@ -530,21 +667,9 @@ export function layoutBowtie(bowtie: Bowtie, layout: LayoutConfig = DEFAULT_LAYO
 			layoutEscalation(barrier, barrierNode, nodes, edges, layout);
 		});
 
-		chain.push(topEventNode);
-		for (let i = 0; i < chain.length - 1; i++) {
-			const from = chain[i];
-			const to = chain[i + 1];
-			const p1 = nodeRight(from);
-			const p2 = nodeLeft(to);
-			const edge = makeBezierEdge(p1.x, p1.y, p2.x, p2.y);
-			edges.push({
-				id: `edge-${from.ref.kind}-${to.ref.kind}-${i}`,
-				path: edge.path,
-				kind: "main",
-				fromRef: from.ref,
-				toRef: to.ref,
-				arrow: edge.arrow,
-			});
+		if (firstTopEventNode) {
+			chain.push(firstTopEventNode);
+			pushChainEdges(chain, edges, "");
 		}
 	});
 
@@ -567,19 +692,19 @@ export function layoutBowtie(bowtie: Bowtie, layout: LayoutConfig = DEFAULT_LAYO
 		};
 		nodes.push(consequenceNode);
 
-		const chain: PositionedNode[] = [topEventNode];
-		const barrierCount = consequence.mitigationBarriers.length;
+		const chain: PositionedNode[] = lastTopEventNode ? [lastTopEventNode] : [];
 		const laneWidth = consequenceColX - mitigationStartX;
-		const mitigationPositions = placeBarriersInLane(
+		const mitigationSlots = layoutBarrierSlots(
 			mitigationStartX,
 			laneWidth,
-			barrierCount,
-			layout.barrierWidth,
-			layout.barrierGap
+			consequence.mitigationBarriers,
+			layout
 		);
 
 		consequence.mitigationBarriers.forEach((barrier, barrierIndex) => {
-			const bx = mitigationPositions[barrierIndex];
+			const slot = mitigationSlots[barrierIndex];
+			if (!slot) return;
+			const bx = slot.x;
 			const barrierHeight = barrierRenderHeight(barrier, layout);
 			const barrierNode: PositionedNode = {
 				ref: {
@@ -598,25 +723,13 @@ export function layoutBowtie(bowtie: Bowtie, layout: LayoutConfig = DEFAULT_LAYO
 			nodes.push(barrierNode);
 			chain.push(barrierNode);
 
-			layoutEscalation(barrier, barrierNode, nodes, edges, layout, consequence.id);
+			layoutEscalation(barrier, barrierNode, nodes, edges, layout, {
+				consequenceId: consequence.id,
+			});
 		});
 
 		chain.push(consequenceNode);
-		for (let i = 0; i < chain.length - 1; i++) {
-			const from = chain[i];
-			const to = chain[i + 1];
-			const p1 = nodeRight(from);
-			const p2 = nodeLeft(to);
-			const edge = makeBezierEdge(p1.x, p1.y, p2.x, p2.y);
-			edges.push({
-				id: `edge-${from.ref.kind}-${to.ref.kind}-${i}-r`,
-				path: edge.path,
-				kind: "main",
-				fromRef: from.ref,
-				toRef: to.ref,
-				arrow: edge.arrow,
-			});
-		}
+		pushChainEdges(chain, edges, "-r");
 	});
 
 	let maxX = consequenceColX + layout.nodeWidth + layout.padding;
@@ -640,97 +753,104 @@ function layoutEscalation(
 	nodes: PositionedNode[],
 	edges: EdgePath[],
 	layout: LayoutConfig,
-	consequenceId?: string
+	context: { eventId?: string; consequenceId?: string } = {}
 ): void {
+	if (!hasSafeguardChain(barrier)) return;
+
 	const threatId = barrierNode.ref.threatId;
-	const factorGap = escalationFactorGap(layout);
+	const { eventId, consequenceId } = context;
 	const escGap = 12;
+	const chainGap = degradationChainGap(layout);
 	const baseY = barrierNode.y + barrierNode.height + layout.escalationOffsetY * ESCALATION_GAP_FACTOR;
-	const factorX = barrierNode.x + barrierNode.width / 2 - layout.escalationWidth / 2;
+	const chainCount = barrier.degradationChains.length;
+	const totalWidth =
+		chainCount * layout.escalationWidth + Math.max(0, chainCount - 1) * chainGap;
+	const startX = barrierNode.x + barrierNode.width / 2 - totalWidth / 2;
 
-	let attachFrom: PositionedNode = barrierNode;
-	let nextY = baseY;
+	barrier.degradationChains.forEach((chain, chainIndex) => {
+		const chainX = startX + chainIndex * (layout.escalationWidth + chainGap);
+		let nextY = baseY;
+		let attachFrom: PositionedNode = barrierNode;
 
-	barrier.escalationFactors.forEach((factor, factorIndex) => {
-		if (factorIndex > 0) nextY += factorGap;
+		chain.safeguards.forEach((safeguard, safeguardIndex) => {
+			nextY += safeguardIndex === 0 ? layout.rowGap * 0.5 : escGap;
 
-		const factorH = escalationNodeHeight(
-			factor.label || "Escalation",
-			layout.escalationWidth,
-			layout.escalationHeight
-		);
-		const factorNode: PositionedNode = {
-			ref: {
-				kind: "escalationFactor",
-				threatId,
-				consequenceId,
-				barrierId: barrier.id,
-				escalationId: factor.id,
-			},
-			kind: "escalationFactor",
-			label: factor.label || "Escalation",
-			subtitle: "Escalation Factor",
-			x: factorX,
-			y: nextY,
-			width: layout.escalationWidth,
-			height: factorH,
-		};
-		nodes.push(factorNode);
-		nextY += factorH;
-
-		const b1 = nodeBottom(attachFrom);
-		const b2 = nodeTop(factorNode);
-		const escEdge = makeLineEdge(b1.x, b1.y, b2.x, b2.y);
-		edges.push({
-			id: `esc-${barrier.id}-${factor.id}`,
-			path: escEdge.path,
-			kind: "escalation",
-			fromRef: attachFrom.ref,
-			toRef: factorNode.ref,
-			arrow: escEdge.arrow,
-		});
-		attachFrom = factorNode;
-
-		factor.escalationBarriers.forEach((escBarrier, escIndex) => {
-			nextY += escIndex === 0 ? layout.rowGap * 0.5 : escGap;
-
-			const escH = escalationNodeHeight(
-				escBarrier.label || "Esc. Barrier",
+			const safeguardH = escalationNodeHeight(
+				safeguard.label || "Safeguard",
 				layout.escalationWidth,
 				layout.escalationHeight
 			);
-			const escNode: PositionedNode = {
+			const safeguardNode: PositionedNode = {
 				ref: {
-					kind: "escalationBarrier",
+					kind: "safeguard",
+					eventId,
 					threatId,
 					consequenceId,
 					barrierId: barrier.id,
-					escalationId: factor.id,
-					escalationBarrierId: escBarrier.id,
+					chainId: chain.id,
+					safeguardId: safeguard.id,
 				},
-				kind: "escalationBarrier",
-				label: escBarrier.label || "Esc. Barrier",
-				subtitle: "Escalation Barrier",
-				x: factorX,
+				kind: "safeguard",
+				label: safeguard.label || "Safeguard",
+				subtitle: "Safeguard",
+				x: chainX,
 				y: nextY,
 				width: layout.escalationWidth,
-				height: escH,
+				height: safeguardH,
 			};
-			nodes.push(escNode);
-			nextY += escH;
+			nodes.push(safeguardNode);
+			nextY += safeguardH;
 
 			const e1 = nodeBottom(attachFrom);
-			const e2 = nodeTop(escNode);
+			const e2 = nodeTop(safeguardNode);
 			const escEdge = makeLineEdge(e1.x, e1.y, e2.x, e2.y);
 			edges.push({
-				id: `escb-${factor.id}-${escBarrier.id}`,
+				id: `sg-${chain.id}-${safeguard.id}`,
 				path: escEdge.path,
-				kind: "escalation",
+				kind: "safeguard",
 				fromRef: attachFrom.ref,
-				toRef: escNode.ref,
+				toRef: safeguardNode.ref,
 				arrow: escEdge.arrow,
 			});
-			attachFrom = escNode;
+			attachFrom = safeguardNode;
+		});
+
+		nextY += chain.safeguards.length === 0 ? layout.rowGap * 0.5 : escGap;
+		const degradation = chain.degradationFactor;
+		const degradationH = escalationNodeHeight(
+			degradation.label || "Degradation",
+			layout.escalationWidth,
+			layout.escalationHeight
+		);
+		const degradationNode: PositionedNode = {
+			ref: {
+				kind: "degradationFactor",
+				eventId,
+				threatId,
+				consequenceId,
+				barrierId: barrier.id,
+				chainId: chain.id,
+			},
+			kind: "degradationFactor",
+			label: degradation.label || "Degradation factor",
+			subtitle: "Degradation Factor",
+			x: chainX,
+			y: nextY,
+			width: layout.escalationWidth,
+			height: degradationH,
+		};
+		nodes.push(degradationNode);
+
+		const d1 = nodeBottom(attachFrom);
+		const d2 = nodeTop(degradationNode);
+		const degEdge = makeLineEdge(d1.x, d1.y, d2.x, d2.y);
+		edges.push({
+			id: `deg-${chain.id}-${degradation.id}`,
+			path: degEdge.path,
+			kind: "degradation",
+			fromRef: attachFrom.ref,
+			toRef: degradationNode.ref,
+			arrow: degEdge.arrow,
 		});
 	});
 }

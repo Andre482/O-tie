@@ -36,44 +36,44 @@ export class HelpModal extends Modal {
 		body.createEl("pre", {
 			cls: "o-tie-help-diagram",
 			text: [
-				"Threats → Prevention Barriers → Top Event → Mitigation Barriers → Consequences",
-				"                                      ↑",
-				"                                   Hazard",
+				"Threats → Prevention Barriers → Event 1 → Barriers → Event 2 → … → Mitigation Barriers → Consequences",
+				"                         ↑ Hazard    ↑ Hazard",
 			].join("\n"),
 		});
 		this.addList(body, [
-			"Hazard (gold) — the source of risk, shown above the top event",
-			"Top Event (red) — the central loss-of-control event",
-			"Threats (gray) — left side; prevention barriers (green) sit on connectors to the top event",
-			"Consequences (purple) — right side; mitigation barriers (green) sit on connectors from the top event",
-			"Escalation factors (purple, dashed) — branch downward from a barrier when something could weaken that barrier",
-			"Escalation barriers (purple, dashed) — sit on escalation factors and control those weakening influences",
+			"Hazard (gold) — the source of risk, shown above each top event",
+			"Top Event (red) — one or more loss-of-control events chained left to right in the center",
+			"Barriers between events — green controls in the lanes connecting consecutive top events",
+			"Threats (gray) — far left; prevention barriers (green) sit on connectors to the first top event",
+			"Consequences (purple) — far right; mitigation barriers (green) sit on connectors from the last top event",
+			"Safeguards (slate blue) — branch downward from a barrier; add as many as needed before each degradation factor",
+			"Degradation factors (warm bronze) — one per ⚡ click; multiple appear in parallel columns below the barrier",
 		]);
 
 		this.addSection(body, "Barriers", [
-			"A barrier is a control that stops or reduces risk along the main bowtie path. In O-Tie, barriers are green nodes on the connectors between threats/consequences and the top event.",
-			"Prevention barriers sit between a threat and the top event. They stop the threat from causing the top event — for example an alarm, an interlock, a procedure, or operator training.",
-			"Mitigation barriers sit between the top event and a consequence. They limit harm if the top event happens — for example emergency shutdown, fire suppression, or evacuation.",
-			"Add prevention barriers from a selected threat (+ Prevention Barrier in the inspector, the lane + button, or the barrier + on the threat node). Add mitigation barriers from a selected consequence the same way, or use + Barrier in the toolbar when a threat or consequence is selected.",
+			"A barrier is a control that stops or reduces risk along the main bowtie path. In O-Tie, barriers are green nodes on the connectors between threats/consequences and top events, or between consecutive top events.",
+			"Prevention barriers sit between a threat and the first top event. They stop the threat from causing the top event — for example an alarm, an interlock, a procedure, or operator training.",
+			"Barriers between events sit in the lanes connecting one top event to the next. They represent controls that prevent escalation from one loss-of-control state to the next.",
+			"Mitigation barriers sit between the last top event and a consequence. They limit harm if the top event happens — for example emergency shutdown, fire suppression, or evacuation.",
+			"Add prevention barriers from a selected threat (+ Prevention Barrier in the inspector, the lane + button, or the barrier + on the threat node). Add barriers between events from a selected top event (except the last) or via the lane + button between events. Add mitigation barriers from a selected consequence the same way, or use + Barrier in the toolbar when a relevant node is selected.",
 			"Each barrier can carry an analysis stack (type, effectiveness, criticality, and more) — see Barrier analysis stacks below.",
 		]);
 
-		this.addSection(body, "Escalation factors and escalation barriers", [
-			"Barriers are not always reliable on their own. An escalation factor describes a condition that could weaken, bypass, or defeat a barrier — such as missed maintenance, fatigue, corrosion, or conflicting procedures.",
-			"In the diagram, escalation factors appear as purple dashed nodes branching below their parent barrier. Dashed connectors show that this is a secondary path: the factor does not replace the main threat-to-event or event-to-consequence flow, but explains how the barrier might fail.",
-			"An escalation barrier is a control targeted at the escalation factor itself — the measure that keeps the weakening influence in check. For example, if an escalation factor is “sensor not calibrated”, an escalation barrier might be “annual calibration program”.",
-			"To add an escalation factor, select a prevention or mitigation barrier, then click + Escalation factor in the inspector, the ⚡ button on the barrier, or use the context menu. To add an escalation barrier, select the escalation factor and use + Escalation barrier, the + button on the factor, or the context menu.",
-			"Name each node to match your risk assessment. Use notes in the inspector for evidence, assumptions, or actions. A complete bowtie often chains several barriers, each with its own escalation factors and escalation barriers where relevant.",
+		this.addSection(body, "Safeguards and degradation factors", [
+			"Barriers are not always reliable on their own. Safeguards are controls that branch downward from a barrier — for example training, inspections, or backup systems. You can add as many safeguards as needed.",
+			"The degradation factor is always the last node in the chain below a barrier and describes the ultimate weakening influence if safeguards fail.",
+			"To add a degradation factor, select a barrier and click the ⚡ button, or use the inspector or context menu. To add safeguards before it, select the degradation factor and use the + button.",
+			"Name each node to match your risk assessment. Use notes in the inspector for evidence, assumptions, or actions.",
 		]);
 
 		this.addSection(body, "Editing", [
-			"Use the toolbar to add threats, consequences, and barriers.",
+			"Use the toolbar to add threats, consequences, top events, and barriers.",
 			"Double-click any node or the diagram title to rename inline.",
 			"Click a node to select it — the inspector bar at the bottom shows label, notes, and actions.",
 			"Right-click nodes or the canvas for a context menu.",
-			"Hover nodes for quick buttons: add barrier, add escalation, or delete.",
+			"Hover nodes for quick buttons: add barrier, add safeguard, or delete.",
 			"Press Delete to remove the selected node.",
-			"Use the + buttons in lanes between threats/consequences and the top event to add barriers quickly.",
+			"Use the + buttons in lanes between nodes to add barriers quickly — including between consecutive top events.",
 		]);
 
 		this.addSection(body, "Barrier analysis stacks", [
@@ -85,9 +85,19 @@ export class HelpModal extends Modal {
 
 		this.addSection(body, "Navigation", [
 			"Drag empty canvas space to pan.",
-			"Scroll the mouse wheel to zoom (hold Ctrl for finer control).",
+			"On phone or tablet: use one finger to pan and two fingers to pinch zoom.",
+			"Scroll the mouse wheel to zoom on desktop (hold Ctrl for finer control).",
+			"Use the toolbar + and − buttons as a zoom fallback on any device.",
 			"Use Fit to center and scale the diagram to the visible area.",
 			"Collapse the toolbar with the chevron button; click the floating button on the canvas to show it again.",
+		]);
+
+		this.addSection(body, "Syncing across devices", [
+			".bowtie files are normal vault files and sync through Obsidian Sync like any other note.",
+			"In Settings → Sync → Selective sync, enable Sync all other types on every device. Custom extensions such as .bowtie are not included in the default image/audio/video/PDF set.",
+			"Under Vault configuration sync, enable Active community plugin list and Installed community plugins so O-Tie is available on mobile.",
+			"After changing sync settings, force-quit and reopen Obsidian on each device.",
+			"Confirm each device is connected to the same remote vault and that no folder containing .bowtie files is listed under Excluded folders.",
 		]);
 
 		this.addSection(body, "Undo and redo", [

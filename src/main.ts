@@ -111,8 +111,8 @@ export default class OTiePlugin extends Plugin {
 		}
 
 		const bowtie = createBowtie(name);
-		bowtie.hazard = "Hazard";
-		bowtie.topEvent = "Top Event";
+		bowtie.events[0].hazard = "Hazard";
+		bowtie.events[0].label = "Top Event";
 
 		const file = await this.app.vault.create(filePath, serializeBowtie(bowtie));
 		await this.openBowtieFile(file);
