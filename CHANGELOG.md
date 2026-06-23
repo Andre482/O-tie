@@ -2,6 +2,15 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.4] — 2026-06-23
+
+### Fixed
+
+- **Mobile + buttons** — Disable CSS `zoom` on mobile (it distorts circular buttons in WebKit) and lock button width/height with min/max constraints.
+- **Mobile pan** — Call `preventDefault` on touch pointer events so Obsidian side menus do not open while panning the canvas.
+
+---
+
 ## [1.0.3] — 2026-06-23
 
 ### Fixed

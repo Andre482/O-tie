@@ -1,4 +1,4 @@
-import { Menu, Notice, TextFileView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
+import { Menu, Notice, Platform, TextFileView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import { ExportImageModal } from "./exportImageModal";
 import { HelpModal } from "./helpModal";
 import type { BowtieExportViewport } from "./exportImage";
@@ -127,8 +127,15 @@ export class BowtieView extends TextFileView {
 	private static readonly MAX_UNDO = 50;
 	private static readonly GRID_SIZE = 20;
 	private stackCollapseBackup: Map<string, boolean> | null = null;
-	private static readonly useCssZoom =
-		typeof CSS !== "undefined" && CSS.supports("zoom", "1");
+
+	private get useCssZoom(): boolean {
+		// CSS zoom distorts border-radius on child buttons in mobile WebKit.
+		return (
+			typeof CSS !== "undefined" &&
+			CSS.supports("zoom", "1") &&
+			!Platform.isMobileApp
+		);
+	}
 
 	constructor(leaf: WorkspaceLeaf, plugin: OTiePlugin) {
 		super(leaf);
@@ -650,7 +657,8 @@ export class BowtieView extends TextFileView {
 
 		const deleteBtn = wrap.createEl("button", { cls: "o-tie-node-delete o-tie-close-btn" });
 		deleteBtn.setAttribute("aria-label", "Delete");
-		deleteBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+		deleteBtn.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+		deleteBtn.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 		deleteBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
 			this.deleteNode(node.ref);
@@ -659,7 +667,8 @@ export class BowtieView extends TextFileView {
 		if (node.kind === "threat" || node.kind === "consequence") {
 			const addBar = wrap.createEl("button", { cls: "o-tie-node-add-barrier o-tie-plus-btn" });
 			addBar.setAttribute("aria-label", "Add barrier");
-			addBar.addEventListener("mousedown", (e) => e.stopPropagation());
+			addBar.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+			addBar.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 			addBar.addEventListener("click", (e) => {
 				e.stopPropagation();
 				if (node.kind === "threat" && node.ref.threatId) {
@@ -675,7 +684,8 @@ export class BowtieView extends TextFileView {
 			if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
 				const addBar = wrap.createEl("button", { cls: "o-tie-node-add-barrier o-tie-plus-btn" });
 				addBar.setAttribute("aria-label", "Add barrier to next event");
-				addBar.addEventListener("mousedown", (e) => e.stopPropagation());
+				addBar.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+			addBar.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 				addBar.addEventListener("click", (e) => {
 					e.stopPropagation();
 					this.addTransitionBarrier(node.ref.eventId!);
@@ -686,7 +696,8 @@ export class BowtieView extends TextFileView {
 		if (isBarrier) {
 			const addDeg = wrap.createEl("button", { cls: "o-tie-node-add-escalation", text: "⚡" });
 			addDeg.setAttribute("aria-label", "Add degradation factor");
-			addDeg.addEventListener("mousedown", (e) => e.stopPropagation());
+			addDeg.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+			addDeg.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 			addDeg.addEventListener("click", (e) => {
 				e.stopPropagation();
 				this.addDegradationFactor(node.ref);
@@ -698,7 +709,8 @@ export class BowtieView extends TextFileView {
 				cls: "o-tie-node-add-esc-barrier o-tie-plus-btn",
 			});
 			addSg.setAttribute("aria-label", "Add safeguard");
-			addSg.addEventListener("mousedown", (e) => e.stopPropagation());
+			addSg.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+			addSg.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 			addSg.addEventListener("click", (e) => {
 				e.stopPropagation();
 				this.addSafeguard(node.ref);
@@ -769,7 +781,8 @@ export class BowtieView extends TextFileView {
 			cls: "o-tie-stack-add o-tie-plus-btn",
 		});
 		addStack.setAttribute("aria-label", "Add stack row");
-		addStack.addEventListener("mousedown", (e) => e.stopPropagation());
+		addStack.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+		addStack.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 		addStack.addEventListener("click", (e) => {
 			e.stopPropagation();
 			this.showAddStackRowMenu(e, node.ref);
@@ -781,7 +794,8 @@ export class BowtieView extends TextFileView {
 			});
 			chevron.setCssStyles({ top: `${headerH}px` });
 			chevron.setAttribute("aria-label", collapsed ? "Expand stack" : "Collapse stack");
-			chevron.addEventListener("mousedown", (e) => e.stopPropagation());
+			chevron.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+			chevron.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 			chevron.addEventListener("click", (e) => {
 				e.stopPropagation();
 				this.toggleBarrierStackCollapsed(node.ref);
@@ -1190,39 +1204,60 @@ export class BowtieView extends TextFileView {
 			menu.showAtMouseEvent(e);
 		});
 
-		this.registerDomEvent(this.containerEl_, "pointerdown", (e) => {
-			const target = e.target as HTMLElement;
-			if (!this.isPanZoomTarget(target)) return;
+		const gestureOptions = { passive: false } as AddEventListenerOptions;
 
-			this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		this.registerDomEvent(
+			this.containerEl_,
+			"pointerdown",
+			(e) => {
+				const target = e.target as HTMLElement;
+				if (!this.isPanZoomTarget(target)) return;
 
-			if (this.activePointers.size === 2) {
-				this.endPan();
-				this.pinchLastDistance = this.pointerDistance();
-				return;
-			}
+				if (e.pointerType === "touch" || e.pointerType === "pen") {
+					e.preventDefault();
+				}
 
-			if (this.activePointers.size === 1) {
-				this.panPointerId = e.pointerId;
-				this.pinchLastDistance = null;
-				this.containerEl_.setPointerCapture(e.pointerId);
-				this.startPan(e.clientX, e.clientY);
-			}
-		});
+				this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-		this.registerDomEvent(this.containerEl_, "pointermove", (e) => {
-			if (!this.activePointers.has(e.pointerId)) return;
-			this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+				if (this.activePointers.size === 2) {
+					this.endPan();
+					this.pinchLastDistance = this.pointerDistance();
+					return;
+				}
 
-			if (this.activePointers.size >= 2) {
-				this.handlePinchZoom();
-				return;
-			}
+				if (this.activePointers.size === 1) {
+					this.panPointerId = e.pointerId;
+					this.pinchLastDistance = null;
+					this.containerEl_.setPointerCapture(e.pointerId);
+					this.startPan(e.clientX, e.clientY);
+				}
+			},
+			gestureOptions
+		);
 
-			if (this.isPanning && e.pointerId === this.panPointerId) {
-				this.updatePan(e.clientX, e.clientY);
-			}
-		});
+		this.registerDomEvent(
+			this.containerEl_,
+			"pointermove",
+			(e) => {
+				if (!this.activePointers.has(e.pointerId)) return;
+
+				if (this.shouldBlockGesture()) {
+					e.preventDefault();
+				}
+
+				this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+				if (this.activePointers.size >= 2) {
+					this.handlePinchZoom();
+					return;
+				}
+
+				if (this.isPanning && e.pointerId === this.panPointerId) {
+					this.updatePan(e.clientX, e.clientY);
+				}
+			},
+			gestureOptions
+		);
 
 		const releasePointer = (e: PointerEvent): void => {
 			if (!this.activePointers.has(e.pointerId)) return;
@@ -1256,6 +1291,29 @@ export class BowtieView extends TextFileView {
 
 		this.registerDomEvent(this.containerEl_, "pointerup", releasePointer);
 		this.registerDomEvent(this.containerEl_, "pointercancel", releasePointer);
+
+		// Fallback for mobile WebViews where pointer capture is unreliable.
+		this.registerDomEvent(
+			this.containerEl_,
+			"touchstart",
+			(e) => {
+				if (e.touches.length !== 1) return;
+				const target = e.target as HTMLElement;
+				if (!this.isPanZoomTarget(target)) return;
+				e.preventDefault();
+			},
+			gestureOptions
+		);
+
+		this.registerDomEvent(
+			this.containerEl_,
+			"touchmove",
+			(e) => {
+				if (!this.shouldBlockGesture()) return;
+				e.preventDefault();
+			},
+			gestureOptions
+		);
 
 		this.registerDomEvent(
 			this.containerEl_,
@@ -1344,7 +1402,7 @@ export class BowtieView extends TextFileView {
 			transformOrigin: "0 0",
 		});
 
-		if (BowtieView.useCssZoom) {
+		if (this.useCssZoom) {
 			this.stageEl.setCssStyles({ zoom: String(zoom), transform: "" });
 		} else {
 			this.stageEl.setCssStyles({
@@ -1401,6 +1459,10 @@ export class BowtieView extends TextFileView {
 		);
 	}
 
+	private blockCanvasGesture(e: Event): void {
+		e.stopPropagation();
+	}
+
 	private startPan(clientX: number, clientY: number): void {
 		this.isPanning = true;
 		this.panStart = { x: clientX, y: clientY };
@@ -1409,6 +1471,7 @@ export class BowtieView extends TextFileView {
 			y: this.bowtie.view?.panY ?? 0,
 		};
 		this.containerEl_.addClass("o-tie-panning");
+		this.contentEl.addClass("o-tie-panning");
 	}
 
 	private updatePan(clientX: number, clientY: number): void {
@@ -1426,7 +1489,12 @@ export class BowtieView extends TextFileView {
 		this.isPanning = false;
 		this.panPointerId = null;
 		this.containerEl_.removeClass("o-tie-panning");
+		this.contentEl.removeClass("o-tie-panning");
 		this.scheduleViewSave();
+	}
+
+	private shouldBlockGesture(): boolean {
+		return this.isPanning || this.activePointers.size >= 2;
 	}
 
 	private pointerDistance(): number {
@@ -1798,8 +1866,8 @@ export class BowtieView extends TextFileView {
 		const btn = this.nodesEl.createEl("button", { cls: "o-tie-lane-add o-tie-plus-btn" });
 		btn.setCssStyles({ left: `${x}px`, top: `${y}px` });
 		btn.setAttribute("aria-label", label);
-		btn.addEventListener("mousedown", (e) => e.stopPropagation());
-		btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+		btn.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
+		btn.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
 		btn.addEventListener("click", (e) => {
 			e.stopPropagation();
 			onClick();

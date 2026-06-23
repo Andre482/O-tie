@@ -1,6 +1,6 @@
 {
 	"name": "o-tie",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Obsidian plugin for building risk bowtie diagrams",
 	"main": "main.js",
 	"scripts": {

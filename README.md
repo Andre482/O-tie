@@ -48,7 +48,8 @@ Threats → Prevention Barriers → Top Event → Mitigation Barriers → Conseq
    - **Click** a node to inspect it in the bottom panel
    - **Right-click** for context menus
    - **Hover** nodes for quick add/delete buttons
-   - **Drag** empty canvas space to pan; **scroll** to zoom
+   - **Drag** empty canvas space to pan; **scroll** to zoom (desktop)
+   - **Phone/tablet**: one finger to pan, two fingers to pinch zoom; toolbar +/− as fallback
    - **Delete** removes the selected node
    - **Ctrl+Z** / **Ctrl+Y** for undo and redo
 4. Changes save automatically.
@@ -59,6 +60,17 @@ Open **Settings → O-Tie** to configure:
 
 - Default folder for new bowties
 - Column gap, row gap, node width, and node height
+
+## Obsidian Sync (phone and tablet)
+
+`.bowtie` files are normal vault files, but **Obsidian Sync does not include custom extensions by default**. On **every device** (desktop, phone, and tablet):
+
+1. Open **Settings → Sync → Selective sync** and enable **Sync all other types**.
+2. Under **Vault configuration sync**, enable **Active community plugin list** and **Installed community plugins** so O-Tie is installed on mobile.
+3. Confirm both devices use the **same remote vault** and no folder with `.bowtie` files is under **Excluded folders**.
+4. Force-quit and reopen Obsidian after changing sync settings.
+
+After updating O-Tie on desktop, let Obsidian Sync finish, then reload Obsidian on mobile so the plugin files (`main.js`, `styles.css`, `manifest.json`) update.
 
 ## Commands
 

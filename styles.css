@@ -149,6 +149,7 @@
 	display: flex;
 	flex-direction: column;
 	height: 100%;
+	overscroll-behavior: contain;
 	--o-tie-hazard: #d4a017;
 	--o-tie-hazard-bg: #fef9e7;
 	--o-tie-top-event: #c0392b;
@@ -333,6 +334,20 @@
 	background-size: 20px 20px;
 	background-position: 0 0;
 	cursor: grab;
+	touch-action: none;
+	overscroll-behavior: none;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+.o-tie-view-root.o-tie-panning,
+.o-tie-canvas-container.o-tie-panning {
+	touch-action: none;
+}
+
+.o-tie-viewport,
+.o-tie-stage,
+.o-tie-nodes {
 	touch-action: none;
 }
 
@@ -696,6 +711,10 @@
 	place-items: center;
 	width: 20px;
 	height: 20px;
+	min-width: 20px;
+	max-width: 20px;
+	min-height: 20px;
+	max-height: 20px;
 	padding: 0;
 	margin: 0;
 	box-sizing: border-box;
@@ -710,10 +729,10 @@
 	-webkit-appearance: none;
 	appearance: none;
 	line-height: 1;
-	min-width: 0;
-	min-height: 0;
 	aspect-ratio: 1;
 	flex-shrink: 0;
+	-webkit-tap-highlight-color: transparent;
+	overflow: hidden;
 }
 
 .o-tie-node-wrap-preventionBarrier .o-tie-stack-add,
@@ -792,6 +811,10 @@
 	display: none;
 	width: 22px;
 	height: 22px;
+	min-width: 22px;
+	max-width: 22px;
+	min-height: 22px;
+	max-height: 22px;
 	padding: 0;
 	margin: 0;
 	box-sizing: border-box;
@@ -807,10 +830,10 @@
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 	-webkit-appearance: none;
 	appearance: none;
-	min-width: 0;
-	min-height: 0;
 	aspect-ratio: 1;
 	flex-shrink: 0;
+	-webkit-tap-highlight-color: transparent;
+	overflow: hidden;
 }
 
 .o-tie-node-wrap:hover .o-tie-node-delete,
@@ -935,6 +958,10 @@
 	place-items: center;
 	width: 26px;
 	height: 26px;
+	min-width: 26px;
+	max-width: 26px;
+	min-height: 26px;
+	max-height: 26px;
 	padding: 0;
 	margin: 0;
 	box-sizing: border-box;
@@ -949,10 +976,10 @@
 	-webkit-appearance: none;
 	appearance: none;
 	line-height: 1;
-	min-width: 0;
-	min-height: 0;
 	aspect-ratio: 1;
 	flex-shrink: 0;
+	-webkit-tap-highlight-color: transparent;
+	overflow: hidden;
 }
 
 .o-tie-lane-add:hover {
