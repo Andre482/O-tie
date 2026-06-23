@@ -2,6 +2,14 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.7] — 2026-06-23
+
+### Fixed
+
+- **Mobile node icon placement** — Overlay +/× buttons align with node corners, matching the desktop corner-offset layout.
+
+---
+
 ## [1.0.6] — 2026-06-23
 
 ### Fixed

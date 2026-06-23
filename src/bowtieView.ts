@@ -114,7 +114,6 @@ export class BowtieView extends TextFileView {
 	private static readonly ICON_SIZE = 22;
 	private static readonly LANE_ADD_SIZE = 26;
 	private static readonly STACK_ADD_SIZE = 20;
-	private static readonly ICON_OFFSET = 9;
 	private wheelRaf: number | null = null;
 	private wheelDeltaAccum = 0;
 	private wheelClient = { x: 0, y: 0 };
@@ -671,14 +670,12 @@ export class BowtieView extends TextFileView {
 			labelEl = el.createDiv({ cls: "o-tie-node-label", text: node.label });
 		}
 
-		const off = BowtieView.ICON_OFFSET;
-		const isSelected = this.isNodeSelected(node.ref);
-
 		if (this.useOverlayControls) {
+			const deleteCenter = this.nodeControlCenter(node, "top-right");
 			this.createOverlayControl(
 				"o-tie-node-delete o-tie-close-btn",
-				node.x + node.width + off,
-				node.y - off,
+				deleteCenter.x,
+				deleteCenter.y,
 				BowtieView.ICON_SIZE,
 				"Delete",
 				() => this.deleteNode(node.ref),
@@ -687,10 +684,11 @@ export class BowtieView extends TextFileView {
 			);
 
 			if (node.kind === "threat" || node.kind === "consequence") {
+				const barCenter = this.nodeControlCenter(node, "bottom-right");
 				this.createOverlayControl(
 					"o-tie-node-add-barrier o-tie-plus-btn",
-					node.x + node.width + off,
-					node.y + node.height + off,
+					barCenter.x,
+					barCenter.y,
 					BowtieView.ICON_SIZE,
 					"Add barrier",
 					() => {
@@ -708,10 +706,11 @@ export class BowtieView extends TextFileView {
 			if (node.kind === "topEvent" && node.ref.eventId) {
 				const eventIndex = this.bowtie.events.findIndex((e) => e.id === node.ref.eventId);
 				if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
+					const barCenter = this.nodeControlCenter(node, "bottom-right");
 					this.createOverlayControl(
 						"o-tie-node-add-barrier o-tie-plus-btn",
-						node.x + node.width + off,
-						node.y + node.height + off,
+						barCenter.x,
+						barCenter.y,
 						BowtieView.ICON_SIZE,
 						"Add barrier to next event",
 						() => this.addTransitionBarrier(node.ref.eventId!),
@@ -722,10 +721,11 @@ export class BowtieView extends TextFileView {
 			}
 
 			if (isBarrier) {
+				const degCenter = this.nodeControlCenter(node, "bottom-left");
 				this.createOverlayControl(
 					"o-tie-node-add-escalation",
-					node.x - off,
-					node.y + node.height + off,
+					degCenter.x,
+					degCenter.y,
 					BowtieView.ICON_SIZE,
 					"Add degradation factor",
 					() => this.addDegradationFactor(node.ref),
@@ -736,10 +736,11 @@ export class BowtieView extends TextFileView {
 			}
 
 			if (node.kind === "degradationFactor") {
+				const sgCenter = this.nodeControlCenter(node, "bottom-right");
 				this.createOverlayControl(
 					"o-tie-node-add-esc-barrier o-tie-plus-btn",
-					node.x + node.width + off,
-					node.y + node.height + off,
+					sgCenter.x,
+					sgCenter.y,
 					BowtieView.ICON_SIZE,
 					"Add safeguard",
 					() => this.addSafeguard(node.ref),
@@ -843,7 +844,6 @@ export class BowtieView extends TextFileView {
 		el: HTMLElement,
 		node: PositionedNode
 	): HTMLElement {
-		const off = BowtieView.ICON_OFFSET;
 		const barrier = this.findBarrier(node.ref);
 		const layout = this.getLayoutConfig();
 		const stack = barrier?.stack ?? [];
@@ -874,10 +874,15 @@ export class BowtieView extends TextFileView {
 		});
 
 		if (this.useOverlayControls) {
+			const stackCenter = this.nodeControlCenter(
+				node,
+				"bottom-right",
+				BowtieView.STACK_ADD_SIZE
+			);
 			this.createOverlayControl(
 				"o-tie-stack-add o-tie-plus-btn",
-				node.x + node.width + off,
-				node.y + node.height + off,
+				stackCenter.x,
+				stackCenter.y,
 				BowtieView.STACK_ADD_SIZE,
 				"Add stack row",
 				(e) => this.showAddStackRowMenu(e, node.ref),
@@ -1593,6 +1598,33 @@ export class BowtieView extends TextFileView {
 	private worldToScreen(wx: number, wy: number): { x: number; y: number } {
 		const view = this.bowtie.view ?? { zoom: 1, panX: 0, panY: 0 };
 		return { x: wx * view.zoom + view.panX, y: wy * view.zoom + view.panY };
+	}
+
+	/** Match desktop corner buttons: anchor on corner + translate(±40%, ±40%). */
+	private nodeControlCenter(
+		node: { x: number; y: number; width: number; height: number },
+		corner: "top-right" | "bottom-right" | "bottom-left",
+		size = BowtieView.ICON_SIZE
+	): { x: number; y: number } {
+		const shift = size * 0.4;
+		const half = size / 2;
+		switch (corner) {
+			case "top-right":
+				return {
+					x: node.x + node.width - half + shift,
+					y: node.y + half - shift,
+				};
+			case "bottom-right":
+				return {
+					x: node.x + node.width - half + shift,
+					y: node.y + node.height - half + shift,
+				};
+			case "bottom-left":
+				return {
+					x: node.x + half - shift,
+					y: node.y + node.height - half + shift,
+				};
+		}
 	}
 
 	private placeOverlayControl(
