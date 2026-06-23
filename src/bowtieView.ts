@@ -1324,6 +1324,7 @@ export class BowtieView extends TextFileView {
 
 				if (e.pointerType === "touch" || e.pointerType === "pen") {
 					e.preventDefault();
+					e.stopPropagation();
 				}
 
 				this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1352,6 +1353,7 @@ export class BowtieView extends TextFileView {
 
 				if (this.shouldBlockGesture()) {
 					e.preventDefault();
+					e.stopPropagation();
 				}
 
 				this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1401,15 +1403,22 @@ export class BowtieView extends TextFileView {
 		this.registerDomEvent(this.containerEl_, "pointerup", releasePointer);
 		this.registerDomEvent(this.containerEl_, "pointercancel", releasePointer);
 
-		// Fallback for mobile WebViews where pointer capture is unreliable.
+		// Block Obsidian app swipe gestures while a finger is on the canvas.
 		this.registerDomEvent(
 			this.containerEl_,
 			"touchstart",
 			(e) => {
-				if (e.touches.length !== 1) return;
 				const target = e.target as HTMLElement;
-				if (!this.isPanZoomTarget(target)) return;
-				e.preventDefault();
+				if (this.isCanvasControl(target)) return;
+				if (e.touches.length === 1) {
+					this.canvasTouchShield = true;
+					if (this.isPanZoomTarget(target)) {
+						this.shieldCanvasTouch(e);
+					}
+				} else {
+					this.canvasTouchShield = true;
+					this.shieldCanvasTouch(e);
+				}
 			},
 			gestureOptions
 		);
@@ -1418,11 +1427,17 @@ export class BowtieView extends TextFileView {
 			this.containerEl_,
 			"touchmove",
 			(e) => {
-				if (!this.shouldBlockGesture()) return;
-				e.preventDefault();
+				if (!this.canvasTouchShield) return;
+				this.shieldCanvasTouch(e, true);
 			},
 			gestureOptions
 		);
+
+		const endCanvasTouchShield = (): void => {
+			this.canvasTouchShield = false;
+		};
+		this.registerDomEvent(this.containerEl_, "touchend", endCanvasTouchShield, gestureOptions);
+		this.registerDomEvent(this.containerEl_, "touchcancel", endCanvasTouchShield, gestureOptions);
 
 		this.registerDomEvent(
 			this.containerEl_,
@@ -1584,14 +1599,18 @@ export class BowtieView extends TextFileView {
 		el: HTMLElement,
 		worldCenterX: number,
 		worldCenterY: number,
-		size: number
+		baseSize: number
 	): void {
+		const view = this.bowtie.view ?? { zoom: 1, panX: 0, panY: 0 };
 		const { x, y } = this.worldToScreen(worldCenterX, worldCenterY);
+		const half = baseSize / 2;
 		el.setCssStyles({
-			left: `${x - size / 2}px`,
-			top: `${y - size / 2}px`,
-			width: `${size}px`,
-			height: `${size}px`,
+			left: `${x - half}px`,
+			top: `${y - half}px`,
+			width: `${baseSize}px`,
+			height: `${baseSize}px`,
+			transform: `scale(${view.zoom})`,
+			transformOrigin: "center center",
 		});
 	}
 
@@ -1658,6 +1677,24 @@ export class BowtieView extends TextFileView {
 		return !!this.selectedRef && nodeRefKey(this.selectedRef) === nodeRefKey(ref);
 	}
 
+	private canvasTouchShield = false;
+
+	private isCanvasControl(target: HTMLElement): boolean {
+		return !!(
+			target.closest(".o-tie-controls-overlay [role='button']") ||
+			target.closest(".o-tie-toolbar-reveal") ||
+			target.closest("button")
+		);
+	}
+
+	private shieldCanvasTouch(e: TouchEvent, allowOffTarget = false): void {
+		const target = e.target as HTMLElement;
+		if (this.isCanvasControl(target)) return;
+		if (!allowOffTarget && !this.containerEl_?.contains(target)) return;
+		e.preventDefault();
+		e.stopPropagation();
+	}
+
 	private isPanZoomTarget(target: HTMLElement): boolean {
 		return !(
 			target.closest(".o-tie-node-wrap") ||
@@ -1670,6 +1707,7 @@ export class BowtieView extends TextFileView {
 
 	private blockCanvasGesture(e: Event): void {
 		e.stopPropagation();
+		if (e.cancelable) e.preventDefault();
 	}
 
 	private startPan(clientX: number, clientY: number): void {

@@ -2,6 +2,15 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.6] — 2026-06-23
+
+### Fixed
+
+- **Mobile icon sizing** — Overlay + buttons now scale with canvas zoom so they stay proportional after Fit or pinch zoom.
+- **Canvas touch capture** — Single-finger touches on the bowtie canvas block Obsidian app swipe gestures; the finger is reserved for panning.
+
+---
+
 ## [1.0.5] — 2026-06-23
 
 ### Fixed

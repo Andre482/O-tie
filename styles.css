@@ -380,11 +380,18 @@
 .o-tie-controls-overlay .o-tie-stack-add,
 .o-tie-controls-overlay .o-tie-lane-add {
 	display: grid;
-	transform: none;
+	transform-origin: center center;
 	top: auto;
 	right: auto;
 	bottom: auto;
 	left: auto;
+}
+
+.o-tie-canvas-container.o-tie-panning,
+.o-tie-view-root.o-tie-panning .o-tie-canvas-container {
+	touch-action: none;
+	-webkit-user-select: none;
+	user-select: none;
 }
 
 .o-tie-viewport {

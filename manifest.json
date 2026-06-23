@@ -1,7 +1,7 @@
 {
 	"id": "o-tie",
 	"name": "O-Tie",
-	"version": "1.0.5",
+	"version": "1.0.6",
 	"minAppVersion": "1.4.0",
 	"description": "Build and edit risk bowtie diagrams in a visual editor with barriers, escalation factors, analysis stacks, and PNG export.",
 	"author": "Andre482",
