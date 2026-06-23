@@ -37,6 +37,7 @@ import {
 	serializeBowtie,
 	sortBarrierStack,
 	touchBowtie,
+	bowtieStructureSignature,
 } from "./model";
 
 const STACK_ROW_COLOR_OPTIONS: { color: string; label: string }[] = [
@@ -95,6 +96,7 @@ export class BowtieView extends TextFileView {
 	private transformEl: HTMLElement;
 	private svgEl: SVGSVGElement;
 	private nodesEl: HTMLElement;
+	private overlayEl: HTMLElement;
 	private toolbarEl: HTMLElement;
 	private inspectorEl: HTMLElement;
 	private isPanning = false;
@@ -108,6 +110,11 @@ export class BowtieView extends TextFileView {
 	private viewShellReady = false;
 	private panZoomReady = false;
 	private externalSyncReady = false;
+	private lastSelfSaveAt = 0;
+	private static readonly ICON_SIZE = 22;
+	private static readonly LANE_ADD_SIZE = 26;
+	private static readonly STACK_ADD_SIZE = 20;
+	private static readonly ICON_OFFSET = 9;
 	private wheelRaf: number | null = null;
 	private wheelDeltaAccum = 0;
 	private wheelClient = { x: 0, y: 0 };
@@ -133,8 +140,12 @@ export class BowtieView extends TextFileView {
 		return (
 			typeof CSS !== "undefined" &&
 			CSS.supports("zoom", "1") &&
-			!Platform.isMobileApp
+			!this.useOverlayControls
 		);
+	}
+
+	private get useOverlayControls(): boolean {
+		return Platform.isMobileApp;
 	}
 
 	constructor(leaf: WorkspaceLeaf, plugin: OTiePlugin) {
@@ -197,6 +208,7 @@ export class BowtieView extends TextFileView {
 		this.saveTimeout = window.setTimeout(() => {
 			this.saveTimeout = null;
 			this.bowtie = touchBowtie(this.bowtie);
+			this.lastSelfSaveAt = Date.now();
 			this.requestSave();
 		}, 400);
 	}
@@ -214,6 +226,7 @@ export class BowtieView extends TextFileView {
 		}
 		if (hadPending) {
 			this.bowtie = touchBowtie(this.bowtie);
+			this.lastSelfSaveAt = Date.now();
 			this.requestSave();
 		}
 	}
@@ -336,6 +349,8 @@ export class BowtieView extends TextFileView {
 		this.transformEl.appendChild(this.svgEl);
 
 		this.nodesEl = this.transformEl.createDiv({ cls: "o-tie-nodes" });
+
+		this.overlayEl = this.containerEl_.createDiv({ cls: "o-tie-controls-overlay" });
 
 		this.inspectorEl = this.contentEl.createDiv({ cls: "o-tie-inspector" });
 
@@ -590,6 +605,7 @@ export class BowtieView extends TextFileView {
 		}
 
 		this.nodesEl.empty();
+		if (this.overlayEl) this.overlayEl.empty();
 		this.renderLaneAddButtons(layout);
 		for (const node of layout.nodes) {
 			this.renderNode(node);
@@ -655,6 +671,83 @@ export class BowtieView extends TextFileView {
 			labelEl = el.createDiv({ cls: "o-tie-node-label", text: node.label });
 		}
 
+		const off = BowtieView.ICON_OFFSET;
+		const isSelected = this.isNodeSelected(node.ref);
+
+		if (this.useOverlayControls) {
+			this.createOverlayControl(
+				"o-tie-node-delete o-tie-close-btn",
+				node.x + node.width + off,
+				node.y - off,
+				BowtieView.ICON_SIZE,
+				"Delete",
+				() => this.deleteNode(node.ref),
+				node.ref,
+				"selected"
+			);
+
+			if (node.kind === "threat" || node.kind === "consequence") {
+				this.createOverlayControl(
+					"o-tie-node-add-barrier o-tie-plus-btn",
+					node.x + node.width + off,
+					node.y + node.height + off,
+					BowtieView.ICON_SIZE,
+					"Add barrier",
+					() => {
+						if (node.kind === "threat" && node.ref.threatId) {
+							this.addPreventionBarrier(node.ref.threatId);
+						} else if (node.kind === "consequence" && node.ref.consequenceId) {
+							this.addMitigationBarrier(node.ref.consequenceId);
+						}
+					},
+					node.ref,
+					"always"
+				);
+			}
+
+			if (node.kind === "topEvent" && node.ref.eventId) {
+				const eventIndex = this.bowtie.events.findIndex((e) => e.id === node.ref.eventId);
+				if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
+					this.createOverlayControl(
+						"o-tie-node-add-barrier o-tie-plus-btn",
+						node.x + node.width + off,
+						node.y + node.height + off,
+						BowtieView.ICON_SIZE,
+						"Add barrier to next event",
+						() => this.addTransitionBarrier(node.ref.eventId!),
+						node.ref,
+						"selected"
+					);
+				}
+			}
+
+			if (isBarrier) {
+				this.createOverlayControl(
+					"o-tie-node-add-escalation",
+					node.x - off,
+					node.y + node.height + off,
+					BowtieView.ICON_SIZE,
+					"Add degradation factor",
+					() => this.addDegradationFactor(node.ref),
+					node.ref,
+					"selected",
+					"⚡"
+				);
+			}
+
+			if (node.kind === "degradationFactor") {
+				this.createOverlayControl(
+					"o-tie-node-add-esc-barrier o-tie-plus-btn",
+					node.x + node.width + off,
+					node.y + node.height + off,
+					BowtieView.ICON_SIZE,
+					"Add safeguard",
+					() => this.addSafeguard(node.ref),
+					node.ref,
+					"selected"
+				);
+			}
+		} else {
 		const deleteBtn = wrap.createEl("button", { cls: "o-tie-node-delete o-tie-close-btn" });
 		deleteBtn.setAttribute("aria-label", "Delete");
 		deleteBtn.addEventListener("mousedown", (e) => this.blockCanvasGesture(e));
@@ -716,14 +809,16 @@ export class BowtieView extends TextFileView {
 				this.addSafeguard(node.ref);
 			});
 		}
+		}
 
 		wrap.addEventListener("click", (e) => {
-			if ((e.target as HTMLElement).closest("button")) return;
+			if ((e.target as HTMLElement).closest("button, [role='button']")) return;
 			e.stopPropagation();
 			this.selectedRef = node.ref;
 			this.renderInspector();
 			this.nodesEl.querySelectorAll(".o-tie-node-wrap").forEach((n) => n.removeClass("o-tie-node-selected"));
 			wrap.addClass("o-tie-node-selected");
+			this.updateOverlayVisibility();
 		});
 
 		if (!isBarrier) {
@@ -748,6 +843,7 @@ export class BowtieView extends TextFileView {
 		el: HTMLElement,
 		node: PositionedNode
 	): HTMLElement {
+		const off = BowtieView.ICON_OFFSET;
 		const barrier = this.findBarrier(node.ref);
 		const layout = this.getLayoutConfig();
 		const stack = barrier?.stack ?? [];
@@ -777,6 +873,18 @@ export class BowtieView extends TextFileView {
 			});
 		});
 
+		if (this.useOverlayControls) {
+			this.createOverlayControl(
+				"o-tie-stack-add o-tie-plus-btn",
+				node.x + node.width + off,
+				node.y + node.height + off,
+				BowtieView.STACK_ADD_SIZE,
+				"Add stack row",
+				(e) => this.showAddStackRowMenu(e, node.ref),
+				node.ref,
+				"selected"
+			);
+		} else {
 		const addStack = wrap.createEl("button", {
 			cls: "o-tie-stack-add o-tie-plus-btn",
 		});
@@ -787,6 +895,7 @@ export class BowtieView extends TextFileView {
 			e.stopPropagation();
 			this.showAddStackRowMenu(e, node.ref);
 		});
+		}
 
 		if (stack.length > 0) {
 			const chevron = wrap.createEl("button", {
@@ -1341,6 +1450,7 @@ export class BowtieView extends TextFileView {
 			this.selectedRef = null;
 			this.renderInspector();
 			this.nodesEl.querySelectorAll(".o-tie-node-wrap").forEach((n) => n.removeClass("o-tie-node-selected"));
+			this.updateOverlayVisibility();
 		});
 
 		this.registerDomEvent(activeDocument, "keydown", (e) => {
@@ -1418,6 +1528,8 @@ export class BowtieView extends TextFileView {
 			const bgY = ((panY % gs) + gs) % gs;
 			this.containerEl_.setCssStyles({ backgroundPosition: `${bgX}px ${bgY}px` });
 		}
+
+		this.updateOverlayPositions();
 	}
 
 	private scheduleViewSave(): void {
@@ -1435,27 +1547,124 @@ export class BowtieView extends TextFileView {
 		this.registerEvent(
 			this.app.vault.on("modify", (file) => {
 				if (!(file instanceof TFile) || file !== this.file) return;
-				if (this.saveTimeout !== null || this.viewSaveTimeout !== null) {
-					new Notice(
-						"O-tie: this bowtie was updated elsewhere. Close and reopen the file to load remote changes.",
-						6000
-					);
-					return;
-				}
-				void this.app.vault.read(file).then((data) => {
-					if (data !== this.getViewData()) {
-						this.setViewData(data, false);
-					}
-				});
+				if (Date.now() - this.lastSelfSaveAt < 3000) return;
+				void this.handleExternalFileChange(file);
 			})
 		);
+	}
+
+	private async handleExternalFileChange(file: TFile): Promise<void> {
+		const disk = await this.app.vault.read(file);
+		if (disk === this.data || disk === this.getViewData()) return;
+
+		let diskBowtie: Bowtie;
+		let localBowtie: Bowtie;
+		try {
+			diskBowtie = deserializeBowtie(disk);
+			localBowtie = this.bowtie;
+		} catch {
+			return;
+		}
+
+		if (bowtieStructureSignature(diskBowtie) === bowtieStructureSignature(localBowtie)) {
+			return;
+		}
+
+		if (this.saveTimeout !== null) return;
+
+		this.setViewData(disk, false);
+	}
+
+	private worldToScreen(wx: number, wy: number): { x: number; y: number } {
+		const view = this.bowtie.view ?? { zoom: 1, panX: 0, panY: 0 };
+		return { x: wx * view.zoom + view.panX, y: wy * view.zoom + view.panY };
+	}
+
+	private placeOverlayControl(
+		el: HTMLElement,
+		worldCenterX: number,
+		worldCenterY: number,
+		size: number
+	): void {
+		const { x, y } = this.worldToScreen(worldCenterX, worldCenterY);
+		el.setCssStyles({
+			left: `${x - size / 2}px`,
+			top: `${y - size / 2}px`,
+			width: `${size}px`,
+			height: `${size}px`,
+		});
+	}
+
+	private createOverlayControl(
+		cls: string,
+		worldCenterX: number,
+		worldCenterY: number,
+		size: number,
+		ariaLabel: string,
+		onClick: (event: MouseEvent) => void,
+		nodeRef?: NodeRef,
+		visibility: "always" | "selected" = "selected",
+		text?: string
+	): HTMLElement {
+		const visible =
+			!nodeRef || visibility === "always" || this.isNodeSelected(nodeRef);
+		const el = this.overlayEl.createDiv({ cls });
+		el.setAttribute("role", "button");
+		el.setAttribute("tabindex", "0");
+		el.setAttribute("aria-label", ariaLabel);
+		if (text) el.setText(text);
+		if (nodeRef) {
+			el.dataset.nodeRef = nodeRefKey(nodeRef);
+			el.dataset.visibility = visibility;
+		}
+		el.dataset.worldCx = String(worldCenterX);
+		el.dataset.worldCy = String(worldCenterY);
+		el.dataset.overlaySize = String(size);
+		if (!visible) el.addClass("o-tie-overlay-hidden");
+		this.placeOverlayControl(el, worldCenterX, worldCenterY, size);
+		el.addEventListener("pointerdown", (e) => this.blockCanvasGesture(e));
+		el.addEventListener("click", (e) => {
+			e.stopPropagation();
+			onClick(e);
+		});
+		return el;
+	}
+
+	private updateOverlayPositions(): void {
+		if (!this.overlayEl) return;
+		this.overlayEl.querySelectorAll<HTMLElement>("[data-world-cx]").forEach((el) => {
+			const cx = parseFloat(el.dataset.worldCx ?? "0");
+			const cy = parseFloat(el.dataset.worldCy ?? "0");
+			const size = parseFloat(el.dataset.overlaySize ?? String(BowtieView.ICON_SIZE));
+			this.placeOverlayControl(el, cx, cy, size);
+		});
+	}
+
+	private updateOverlayVisibility(): void {
+		if (!this.useOverlayControls || !this.overlayEl) return;
+		this.overlayEl.querySelectorAll<HTMLElement>("[data-node-ref]").forEach((el) => {
+			const refKey = el.dataset.nodeRef;
+			const always = el.dataset.visibility === "always";
+			const selected =
+				!!this.selectedRef &&
+				!!refKey &&
+				nodeRefKey(this.selectedRef) === refKey;
+			if (always || selected) el.removeClass("o-tie-overlay-hidden");
+			else el.addClass("o-tie-overlay-hidden");
+		});
+	}
+
+	private isNodeSelected(ref: NodeRef): boolean {
+		return !!this.selectedRef && nodeRefKey(this.selectedRef) === nodeRefKey(ref);
 	}
 
 	private isPanZoomTarget(target: HTMLElement): boolean {
 		return !(
 			target.closest(".o-tie-node-wrap") ||
+			target.closest(".o-tie-controls-overlay") ||
 			target.closest(".o-tie-lane-add") ||
-			target.closest("button")
+			target.closest("button") ||
+			target.closest('[role="button"]')
 		);
 	}
 
@@ -1863,6 +2072,19 @@ export class BowtieView extends TextFileView {
 		label: string,
 		onClick: () => void
 	): void {
+		if (this.useOverlayControls) {
+			const half = BowtieView.LANE_ADD_SIZE / 2;
+			this.createOverlayControl(
+				"o-tie-lane-add o-tie-plus-btn",
+				x + half,
+				y + half,
+				BowtieView.LANE_ADD_SIZE,
+				label,
+				() => onClick()
+			);
+			return;
+		}
+
 		const btn = this.nodesEl.createEl("button", { cls: "o-tie-lane-add o-tie-plus-btn" });
 		btn.setCssStyles({ left: `${x}px`, top: `${y}px` });
 		btn.setAttribute("aria-label", label);

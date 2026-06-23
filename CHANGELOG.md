@@ -2,6 +2,15 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.5] — 2026-06-23
+
+### Fixed
+
+- **Mobile + buttons** — Round icon controls render in an unscaled overlay layer on mobile so pan/zoom no longer stretches them into ovals.
+- **False sync notices** — Removed the repeated "updated elsewhere" toast; remote changes reload silently only when diagram content actually differs.
+
+---
+
 ## [1.0.4] — 2026-06-23
 
 ### Fixed

@@ -405,6 +405,15 @@ export function touchBowtie(bowtie: Bowtie): Bowtie {
 	};
 }
 
+/** Compare bowtie diagram content, ignoring pan/zoom and save timestamps. */
+export function bowtieStructureSignature(bowtie: Bowtie): string {
+	const copy = cloneBowtie(bowtie);
+	copy.view = { zoom: 1, panX: 0, panY: 0 };
+	copy.createdAt = "";
+	copy.updatedAt = "";
+	return JSON.stringify(copy);
+}
+
 export type NodeKind =
 	| "hazard"
 	| "topEvent"

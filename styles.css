@@ -355,6 +355,38 @@
 	cursor: grabbing;
 }
 
+.o-tie-controls-overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: visible;
+	z-index: 5;
+}
+
+.o-tie-controls-overlay > * {
+	position: absolute;
+	pointer-events: auto;
+	box-sizing: border-box;
+}
+
+.o-tie-overlay-hidden {
+	display: none !important;
+}
+
+.o-tie-controls-overlay .o-tie-node-delete,
+.o-tie-controls-overlay .o-tie-node-add-barrier,
+.o-tie-controls-overlay .o-tie-node-add-escalation,
+.o-tie-controls-overlay .o-tie-node-add-esc-barrier,
+.o-tie-controls-overlay .o-tie-stack-add,
+.o-tie-controls-overlay .o-tie-lane-add {
+	display: grid;
+	transform: none;
+	top: auto;
+	right: auto;
+	bottom: auto;
+	left: auto;
+}
+
 .o-tie-viewport {
 	position: absolute;
 	top: 0;
