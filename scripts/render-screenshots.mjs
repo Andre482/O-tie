@@ -141,6 +141,59 @@ function buildBarrierBowtie(model) {
 	return bt;
 }
 
+// Two-event ("chained") bowtie: a loss of containment that can escalate to an
+// ignited release. Threats feed the first top event, between-event barriers sit
+// between the two top events, and consequences flow from the second top event.
+function buildMultiEventBowtie(model) {
+	const bt = model.createBowtie("Flammable gas release escalating to fire");
+	bt.events[0].label = "Loss of containment of flammable gas";
+	bt.events[0].hazard = "Pressurised flammable hydrocarbon";
+
+	const ignited = model.createTopEvent(
+		"Ignited release — jet fire / explosion",
+		"Ignition energy & confinement"
+	);
+	bt.events.push(ignited);
+
+	const gasDetect = model.createBarrier("Gas detection & emergency shutdown (ESD)");
+	addStack(model, gasDetect, [
+		["type", "Active Hardware+Human"],
+		["effectiveness", "Good"],
+		["criticality", "Very High"],
+	]);
+	const ignitionControl = model.createBarrier("Ignition source control / hazardous area");
+	addStack(model, ignitionControl, [
+		["type", "Passive Hardware"],
+		["status", "Available"],
+	]);
+	bt.events[0].transitionBarriers = [gasDetect, ignitionControl];
+
+	const corrosion = model.createThreat("Corrosion / erosion of pipework");
+	corrosion.preventionBarriers = [
+		model.createBarrier("Mechanical integrity inspection"),
+		model.createBarrier("Corrosion monitoring"),
+	];
+	const overpressure = model.createThreat("Process overpressure");
+	overpressure.preventionBarriers = [model.createBarrier("Pressure relief & high-pressure trip")];
+	const leak = model.createThreat("Flange / seal leak");
+	leak.preventionBarriers = [model.createBarrier("Flange management & leak testing")];
+	bt.threats = [corrosion, overpressure, leak];
+
+	const injury = model.createConsequence("Personnel burns / fatality");
+	const fireProt = model.createBarrier("Fireproofing & deluge protection");
+	addStack(model, fireProt, [
+		["type", "Active Hardware"],
+		["status", "Available"],
+	]);
+	injury.mitigationBarriers = [fireProt, model.createBarrier("Emergency response & evacuation")];
+
+	const escalation = model.createConsequence("Escalation to adjacent units");
+	escalation.mitigationBarriers = [model.createBarrier("Plant spacing & blast walls")];
+
+	bt.consequences = [injury, escalation];
+	return bt;
+}
+
 function renderNodeHtml(node, barriersById) {
 	const wrapStyle = `left:${node.x}px;top:${node.y}px;width:${node.width}px;height:${node.height}px`;
 	const inner = renderNodeInner(node, barriersById);
@@ -271,6 +324,7 @@ async function main() {
 	const page = await browser.newPage({ deviceScaleFactor: 2 });
 	try {
 		await capture(page, engine, buildHeroBowtie(engine.model), join(assetsDir, "screenshot-diagram.png"));
+		await capture(page, engine, buildMultiEventBowtie(engine.model), join(assetsDir, "screenshot-multi-event.png"));
 		await capture(page, engine, buildBarrierBowtie(engine.model), join(assetsDir, "screenshot-barrier.png"));
 	} finally {
 		await browser.close();

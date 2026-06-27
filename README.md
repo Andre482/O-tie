@@ -10,6 +10,10 @@ Diagrams are stored as `.bowtie` files in your vault and auto-save as you edit.
 
 *A bowtie for a cold-storage ammonia loss-of-primary-containment scenario.*
 
+![A two-event bowtie where a loss of containment of flammable gas escalates to an ignited release, with between-event barriers (gas detection and emergency shutdown, ignition source control) separating the two top events](assets/screenshot-multi-event.png)
+
+*A chained, multi-event bowtie: between-event barriers sit between two top events, so threats feed the first event and consequences flow from the second.*
+
 ![A prevention barrier with its full analysis stack — type, effectiveness, criticality, responsible party, validation method, and status — plus a safeguard and degradation factor below it](assets/screenshot-barrier.png)
 
 *Per-barrier analysis stacks and escalation factors (safeguards and degradation factors).*
