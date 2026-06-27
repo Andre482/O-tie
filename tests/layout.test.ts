@@ -41,6 +41,12 @@ describe("nodeBoxHeight", () => {
 		);
 		expect(long).toBeGreaterThan(short);
 	});
+
+	it("grows for explicit line breaks", () => {
+		const single = nodeBoxHeight("Line one", 200, 40);
+		const multiline = nodeBoxHeight("Line one\nLine two\nLine three", 200, 40);
+		expect(multiline).toBeGreaterThan(single);
+	});
 });
 
 describe("barrierHeaderHeightFor", () => {

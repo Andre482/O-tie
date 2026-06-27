@@ -32,6 +32,7 @@ import {
 	type DegradationChain,
 	type EscalationNode,
 	nodeRefKey,
+	parseNodeRefKey,
 	type NodeRef,
 	serializeBowtie,
 	sortBarrierStack,
@@ -65,6 +66,10 @@ export class BowtieView extends TextFileView {
 	private pinchLastDistance: number | null = null;
 	private gestureMoved = false;
 	private panStartedOnNode = false;
+	private panDeferFromNode = false;
+	private panDeferPointerId: number | null = null;
+	private panDeferStart = { x: 0, y: 0 };
+	private panDeferTarget: HTMLElement | null = null;
 	private suppressNextClick = false;
 	private saveTimeout: number | null = null;
 	private viewSaveTimeout: number | null = null;
@@ -72,6 +77,7 @@ export class BowtieView extends TextFileView {
 	private panZoomReady = false;
 	private externalSyncReady = false;
 	private lastSelfSaveAt = 0;
+	private static readonly PAN_DRAG_THRESHOLD = 6;
 	private static readonly ICON_SIZE = 22;
 	private static readonly LANE_ADD_SIZE = 26;
 	private static readonly STACK_ADD_SIZE = 20;
@@ -448,16 +454,18 @@ export class BowtieView extends TextFileView {
 		});
 
 		const fields = row.createDiv({ cls: "o-tie-inspector-fields" });
-		const input = fields.createEl("input", {
-			type: "text",
+		const labelArea = fields.createEl("textarea", {
 			cls: "o-tie-inspector-input",
+			placeholder: "Label",
+			attr: { rows: "1" },
 		});
-		input.value = label;
-		input.placeholder = "Label";
-		input.addEventListener("change", () => {
-			if (input.value === label) return;
+		labelArea.value = label;
+		window.requestAnimationFrame(() => this.fitInspectorTextArea(labelArea));
+		labelArea.addEventListener("input", () => this.fitInspectorTextArea(labelArea));
+		labelArea.addEventListener("change", () => {
+			if (labelArea.value === label) return;
 			this.commitEdit();
-			this.setNodeLabel(this.selectedRef!, input.value);
+			this.setNodeLabel(this.selectedRef!, labelArea.value);
 			this.render();
 			this.scheduleSave();
 		});
@@ -469,8 +477,8 @@ export class BowtieView extends TextFileView {
 			attr: { rows: "2" },
 		});
 		notesArea.value = notes;
-		window.requestAnimationFrame(() => this.fitInspectorNotesArea(notesArea));
-		notesArea.addEventListener("input", () => this.fitInspectorNotesArea(notesArea));
+		window.requestAnimationFrame(() => this.fitInspectorTextArea(notesArea));
+		notesArea.addEventListener("input", () => this.fitInspectorTextArea(notesArea));
 		notesArea.addEventListener("change", () => {
 			if (notesArea.value === notes) return;
 			this.commitEdit();
@@ -539,7 +547,7 @@ export class BowtieView extends TextFileView {
 		});
 	}
 
-	private fitInspectorNotesArea(textarea: HTMLTextAreaElement): void {
+	private fitInspectorTextArea(textarea: HTMLTextAreaElement): void {
 		textarea.addClass("o-tie-inspector-notes-resize");
 		textarea.setCssStyles({ height: `${textarea.scrollHeight}px` });
 		textarea.removeClass("o-tie-inspector-notes-resize");
@@ -1265,14 +1273,16 @@ export class BowtieView extends TextFileView {
 		initial: string,
 		onCommit: (value: string) => void
 	): void {
-		const input = activeDocument.createElement("input");
-		input.type = "text";
+		const input = activeDocument.createElement("textarea");
 		input.className = "o-tie-inline-edit";
+		input.rows = 1;
 		input.value = initial;
 		el.empty();
 		el.appendChild(input);
 		input.focus();
 		input.select();
+		window.requestAnimationFrame(() => this.fitInspectorTextArea(input));
+		input.addEventListener("input", () => this.fitInspectorTextArea(input));
 
 		// onCommit/cancel can detach the focused input (via render), which fires a
 		// trailing blur. Guard so commit/cancel run exactly once.
@@ -1282,7 +1292,7 @@ export class BowtieView extends TextFileView {
 			if (finished) return;
 			finished = true;
 			const v = input.value.trim();
-			if (v && v !== initial) {
+			if (v !== initial.trim()) {
 				this.commitEdit();
 				onCommit(v);
 			} else {
@@ -1298,9 +1308,8 @@ export class BowtieView extends TextFileView {
 
 		input.addEventListener("blur", commit);
 		input.addEventListener("keydown", (e) => {
-			if (e.key === "Enter") {
-				e.preventDefault();
-				commit();
+			if (e.key === "Delete" || e.key === "Backspace") {
+				e.stopPropagation();
 			}
 			if (e.key === "Escape") {
 				e.preventDefault();
@@ -1341,10 +1350,9 @@ export class BowtieView extends TextFileView {
 				const target = e.target as HTMLElement;
 				const isTouch = e.pointerType === "touch" || e.pointerType === "pen";
 				const onEmptyCanvas = this.isPanZoomTarget(target);
-				// On touch/pen, let a single-finger drag pan from anywhere on the
-				// canvas (including on top of a node), as long as the finger isn't on
-				// an interactive control. A tap still selects the node (see pointerup).
-				const fromNode = isTouch && !onEmptyCanvas && !this.isInteractiveControl(target);
+				// Drag-pan can start on a node after a small movement threshold. A tap/click
+				// without movement selects the node (see releasePointer).
+				const fromNode = this.isNodePanSurface(target);
 				if (!onEmptyCanvas && !fromNode) return;
 
 				if (isTouch && onEmptyCanvas) {
@@ -1355,16 +1363,26 @@ export class BowtieView extends TextFileView {
 				this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
 				if (this.activePointers.size === 2) {
+					this.cancelDeferredNodePan();
 					this.endPan();
 					this.pinchLastDistance = this.pointerDistance();
 					return;
 				}
 
 				if (this.activePointers.size === 1) {
-					this.panPointerId = e.pointerId;
 					this.pinchLastDistance = null;
 					this.gestureMoved = false;
-					this.panStartedOnNode = fromNode;
+					if (fromNode) {
+						this.panDeferFromNode = true;
+						this.panDeferPointerId = e.pointerId;
+						this.panDeferStart = { x: e.clientX, y: e.clientY };
+						this.panDeferTarget = target;
+						this.panStartedOnNode = false;
+						return;
+					}
+
+					this.panPointerId = e.pointerId;
+					this.panStartedOnNode = false;
 					this.containerEl_.setPointerCapture(e.pointerId);
 					this.startPan(e.clientX, e.clientY);
 				}
@@ -1377,6 +1395,14 @@ export class BowtieView extends TextFileView {
 			"pointermove",
 			(e) => {
 				if (!this.activePointers.has(e.pointerId)) return;
+
+				if (this.panDeferFromNode && e.pointerId === this.panDeferPointerId) {
+					const dx = e.clientX - this.panDeferStart.x;
+					const dy = e.clientY - this.panDeferStart.y;
+					if (Math.hypot(dx, dy) > BowtieView.PAN_DRAG_THRESHOLD) {
+						this.beginPanFromDeferredNode(e);
+					}
+				}
 
 				if (this.shouldBlockGesture()) {
 					e.preventDefault();
@@ -1399,6 +1425,12 @@ export class BowtieView extends TextFileView {
 
 		const releasePointer = (e: PointerEvent): void => {
 			if (!this.activePointers.has(e.pointerId)) return;
+
+			if (this.panDeferFromNode && e.pointerId === this.panDeferPointerId) {
+				this.trySelectNodeTarget(this.panDeferTarget);
+				this.cancelDeferredNodePan();
+			}
+
 			this.activePointers.delete(e.pointerId);
 
 			if (this.containerEl_.hasPointerCapture(e.pointerId)) {
@@ -1410,8 +1442,6 @@ export class BowtieView extends TextFileView {
 			}
 
 			if (e.pointerId === this.panPointerId) {
-				// A drag that began on a node must not also fire the node's tap-select
-				// click. A pure tap (no movement) falls through and selects normally.
 				if (this.gestureMoved && this.panStartedOnNode) {
 					this.suppressNextClick = true;
 				}
@@ -1443,15 +1473,10 @@ export class BowtieView extends TextFileView {
 			(e) => {
 				const target = e.target as HTMLElement;
 				if (this.isCanvasControl(target)) return;
-				if (e.touches.length === 1) {
-					this.canvasTouchShield = true;
-					if (this.isPanZoomTarget(target)) {
-						this.shieldCanvasTouch(e);
-					}
-				} else {
-					this.canvasTouchShield = true;
-					this.shieldCanvasTouch(e);
-				}
+				// Defer touch shield on nodes so a tap can select; pan enables shield once dragging.
+				if (e.touches.length === 1 && this.isNodePanSurface(target)) return;
+				this.canvasTouchShield = true;
+				this.shieldCanvasTouch(e);
 			},
 			gestureOptions
 		);
@@ -1460,6 +1485,7 @@ export class BowtieView extends TextFileView {
 			this.containerEl_,
 			"touchmove",
 			(e) => {
+				if (this.isPanning) this.canvasTouchShield = true;
 				if (!this.canvasTouchShield) return;
 				this.shieldCanvasTouch(e, true);
 			},
@@ -1737,13 +1763,48 @@ export class BowtieView extends TextFileView {
 		e.stopPropagation();
 	}
 
+	private isNodePanSurface(target: HTMLElement): boolean {
+		return !this.isPanZoomTarget(target) && !this.isInteractiveControl(target);
+	}
+
+	private cancelDeferredNodePan(): void {
+		this.panDeferFromNode = false;
+		this.panDeferPointerId = null;
+		this.panDeferTarget = null;
+	}
+
+	private beginPanFromDeferredNode(e: PointerEvent): void {
+		this.panDeferFromNode = false;
+		this.panDeferTarget = null;
+		this.panPointerId = e.pointerId;
+		this.panStartedOnNode = true;
+		this.gestureMoved = true;
+		this.canvasTouchShield = true;
+		this.containerEl_.setPointerCapture(e.pointerId);
+		this.startPan(this.panDeferStart.x, this.panDeferStart.y);
+		this.updatePan(e.clientX, e.clientY);
+	}
+
+	private trySelectNodeTarget(target: HTMLElement | null): void {
+		if (!target) return;
+		if (target.closest("button")) return;
+		if (target.closest(".o-tie-stack-row-clickable")) return;
+		const wrap = target.closest(".o-tie-node-wrap");
+		if (!wrap) return;
+		const ref = parseNodeRefKey(wrap.getAttribute("data-ref") ?? "");
+		if (!ref) return;
+		this.suppressNextClick = true;
+		this.selectNodeElement(ref, wrap);
+	}
+
 	private isInteractiveControl(target: HTMLElement): boolean {
-		return !!(
-			target.closest(".o-tie-controls-overlay") ||
-			target.closest(".o-tie-lane-add") ||
-			target.closest("button") ||
-			target.closest('[role="button"]')
-		);
+		if (target.closest(".o-tie-controls-overlay")) return true;
+		if (target.closest(".o-tie-lane-add")) return true;
+		if (target.closest("button")) return true;
+		const roleBtn = target.closest('[role="button"]');
+		// Node wraps use role="button" for keyboard a11y only — touch drag should still pan.
+		if (roleBtn && !roleBtn.hasClass("o-tie-node-wrap")) return true;
+		return false;
 	}
 
 	private isPanZoomTarget(target: HTMLElement): boolean {

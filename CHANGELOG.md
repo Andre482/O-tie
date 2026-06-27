@@ -2,6 +2,18 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.12] — 2026-06-27
+
+### Fixed
+
+- **Inspector label field** — The label input now auto-expands vertically like the notes field, so long text is fully visible while editing.
+- **Multiline node labels** — Line breaks entered in the inspector or inline editor are shown on diagram nodes, and node height grows to fit.
+- **Inline label edit** — Clearing a label with delete/backspace now commits correctly; inline edit uses a textarea so multiline labels match the inspector.
+- **Pan from nodes** — Drag-pan works when the pointer starts on a node (mouse, touch, or pen), not only on empty canvas space.
+- **Node tap/click** — A tap or click without movement still selects the node and opens the inspector bar after the pan-on-node fix.
+
+---
+
 ## [1.0.11] — 2026-06-27
 
 ### Changed

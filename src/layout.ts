@@ -48,13 +48,9 @@ const NODE_BOX_BUFFER = 8;
 const ESCALATION_NODE_BUFFER = 6;
 const ESCALATION_GAP_FACTOR = 0.5;
 
-function estimateLabelLines(label: string, width: number): number {
-	const text = label?.trim() ?? "";
-	if (!text) return 1;
-
-	const usable = Math.max(20, width - LABEL_PAD_X);
-	const charsPerLine = Math.max(6, Math.floor(usable / AVG_CHAR_WIDTH));
+function estimateWrappedLines(text: string, charsPerLine: number): number {
 	const words = text.split(/\s+/).filter(Boolean);
+	if (words.length === 0) return 1;
 
 	let lines = 1;
 	let lineLen = 0;
@@ -79,7 +75,23 @@ function estimateLabelLines(label: string, width: number): number {
 		}
 	}
 
-	return Math.max(1, lines);
+	return lines;
+}
+
+function estimateLabelLines(label: string, width: number): number {
+	const text = label ?? "";
+	if (!text.trim() && !text.includes("\n")) return 1;
+
+	const usable = Math.max(20, width - LABEL_PAD_X);
+	const charsPerLine = Math.max(6, Math.floor(usable / AVG_CHAR_WIDTH));
+	const paragraphs = text.split("\n");
+
+	let totalLines = 0;
+	for (const para of paragraphs) {
+		totalLines += para.trim() ? estimateWrappedLines(para, charsPerLine) : 1;
+	}
+
+	return Math.max(1, totalLines);
 }
 
 function labelBlockHeight(label: string, width: number): number {

@@ -496,3 +496,18 @@ export function nodeRefKey(ref: NodeRef): string {
 	];
 	return parts.join(":");
 }
+
+export function parseNodeRefKey(key: string): NodeRef | null {
+	const [kind, eventId, threatId, consequenceId, barrierId, chainId, safeguardId] =
+		key.split(":");
+	if (!kind) return null;
+	return {
+		kind: kind as NodeKind,
+		eventId: eventId || undefined,
+		threatId: threatId || undefined,
+		consequenceId: consequenceId || undefined,
+		barrierId: barrierId || undefined,
+		chainId: chainId || undefined,
+		safeguardId: safeguardId || undefined,
+	};
+}
