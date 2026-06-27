@@ -801,7 +801,8 @@ export class BowtieView extends TextFileView {
 		wrap.setAttribute("aria-pressed", this.isNodeSelected(node.ref) ? "true" : "false");
 
 		wrap.addEventListener("click", (e) => {
-			if ((e.target as HTMLElement).closest("button, [role='button']")) return;
+			const target = e.target as HTMLElement;
+			if (target.closest("button")) return;
 			e.stopPropagation();
 			this.selectNodeElement(node.ref, wrap);
 		});
