@@ -2,6 +2,21 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.9] — 2026-06-27
+
+### Fixed
+
+- **Inline rename** — Pressing `Escape` now reliably cancels a label edit instead of saving it, and pressing `Enter` commits exactly once (no duplicate undo step or extra redraw).
+- **Malformed file recovery** — A `.bowtie` file missing barrier arrays (for example, a threat without `preventionBarriers`) is now repaired on open instead of being rejected as malformed.
+- **Corrupt view state** — Diagram zoom/pan is sanitised on load, preventing an invisible canvas or a broken image export from an out-of-range or non-numeric zoom.
+- **File naming** — New bowtie and exported image names are hardened against dot-only names, trailing dots, and Windows reserved names.
+
+### Changed
+
+- Internal/build: aligned `esbuild` with the version required by the test toolchain so `npm ci` resolves a single version on CI (also clears a dev-only advisory), and added a two-event example screenshot to the README.
+
+---
+
 ## [1.0.8] — 2026-06-27
 
 ### Added
