@@ -1,6 +1,6 @@
 /* Settings */
-.o-tie-setting-invalid {
-	border-color: var(--text-error) !important;
+.setting-item input.o-tie-setting-invalid {
+	border-color: var(--text-error);
 	box-shadow: 0 0 0 1px var(--text-error);
 }
 
@@ -375,8 +375,8 @@
 	box-sizing: border-box;
 }
 
-.o-tie-overlay-hidden {
-	display: none !important;
+.o-tie-controls-overlay > .o-tie-overlay-hidden {
+	display: none;
 }
 
 .o-tie-controls-overlay .o-tie-node-delete,
