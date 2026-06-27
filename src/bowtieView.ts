@@ -1789,12 +1789,12 @@ export class BowtieView extends TextFileView {
 		if (!target) return;
 		if (target.closest("button")) return;
 		if (target.closest(".o-tie-stack-row-clickable")) return;
-		const wrap = target.closest(".o-tie-node-wrap");
-		if (!wrap) return;
-		const ref = parseNodeRefKey(wrap.getAttribute("data-ref") ?? "");
+		const wrapElement = target.closest(".o-tie-node-wrap");
+		if (!(wrapElement instanceof HTMLElement)) return;
+		const ref = parseNodeRefKey(wrapElement.getAttribute("data-ref") ?? "");
 		if (!ref) return;
 		this.suppressNextClick = true;
-		this.selectNodeElement(ref, wrap);
+		this.selectNodeElement(ref, wrapElement);
 	}
 
 	private isInteractiveControl(target: HTMLElement): boolean {
