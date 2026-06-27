@@ -2,6 +2,17 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.10] — 2026-06-27
+
+### Fixed
+
+- **Fit** — The Fit command now zooms out far enough to show the entire diagram; large bowties are no longer clipped by an artificial minimum zoom floor.
+- **Node selection** — Single-clicking a node again opens the bottom inspector bar and selected-state controls (regression from 1.0.8).
+- **CSS lint** — Removed `!important` overrides by increasing selector specificity for invalid settings inputs and hidden overlay controls.
+- **Lint** — Filename sanitisation no longer needs an eslint-disable directive.
+
+---
+
 ## [1.0.9] — 2026-06-27
 
 ### Fixed

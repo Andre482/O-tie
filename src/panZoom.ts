@@ -2,7 +2,6 @@ import type { BowtieViewState } from "./model";
 
 export const MIN_ZOOM = 0.2;
 export const MAX_ZOOM = 3;
-export const FIT_MIN_ZOOM = 0.3;
 export const FIT_MAX_ZOOM = 1.2;
 
 export function clampZoom(zoom: number, min = MIN_ZOOM, max = MAX_ZOOM): number {
@@ -63,7 +62,9 @@ export function computeFit(
 ): BowtieViewState {
 	const scaleX = (rectWidth - padding * 2) / boundsWidth;
 	const scaleY = (rectHeight - padding * 2) / boundsHeight;
-	const zoom = Math.min(FIT_MAX_ZOOM, Math.max(FIT_MIN_ZOOM, Math.min(scaleX, scaleY)));
+	const scale = Math.min(scaleX, scaleY);
+	// Fit must be allowed to zoom out below MIN_ZOOM so large diagrams fit entirely.
+	const zoom = Math.min(FIT_MAX_ZOOM, Math.max(0.01, scale));
 	return {
 		zoom,
 		panX: (rectWidth - boundsWidth * zoom) / 2,

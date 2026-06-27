@@ -55,4 +55,15 @@ describe("computeFit", () => {
 		expect(fit.panX).toBeCloseTo((1000 - renderedW) / 2, 5);
 		expect(fit.panY).toBeCloseTo((600 - renderedH) / 2, 5);
 	});
+
+	it("zooms out enough for large diagrams to fit inside the viewport", () => {
+		const viewportW = 800;
+		const viewportH = 600;
+		const padding = 40;
+		const fit = computeFit(5000, 3000, viewportW, viewportH, padding);
+		const renderedW = 5000 * fit.zoom;
+		const renderedH = 3000 * fit.zoom;
+		expect(renderedW).toBeLessThanOrEqual(viewportW - padding * 2 + 0.01);
+		expect(renderedH).toBeLessThanOrEqual(viewportH - padding * 2 + 0.01);
+	});
 });
