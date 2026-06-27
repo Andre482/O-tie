@@ -7,6 +7,7 @@ import {
 	createConsequence,
 	createThreat,
 	deserializeBowtie,
+	sanitizeBaseName,
 	serializeBowtie,
 	type Bowtie,
 } from "../src/model";
@@ -124,6 +125,70 @@ describe("validation", () => {
 		);
 		expect(bt.events).toHaveLength(1);
 		expect(typeof bt.events[0].hazard).toBe("string");
+	});
+
+	it("normalizes threats/consequences missing barrier arrays instead of throwing", () => {
+		const bt = deserializeBowtie(
+			JSON.stringify({
+				id: "a",
+				name: "b",
+				events: [{ id: "e1", label: "T", hazard: "H" }],
+				threats: [{ id: "t1", label: "Threat" }],
+				consequences: [{ id: "c1", label: "Consequence" }],
+			})
+		);
+		expect(bt.threats[0].preventionBarriers).toEqual([]);
+		expect(bt.consequences[0].mitigationBarriers).toEqual([]);
+	});
+});
+
+describe("view sanitization", () => {
+	it("clamps an out-of-range zoom on load", () => {
+		const bt = deserializeBowtie(
+			JSON.stringify({
+				id: "a",
+				name: "b",
+				events: [{ id: "e1", label: "T", hazard: "H" }],
+				threats: [],
+				consequences: [],
+				view: { zoom: 0, panX: 10, panY: -5 },
+			})
+		);
+		expect(bt.view).toEqual({ zoom: 0.2, panX: 10, panY: -5 });
+	});
+
+	it("replaces non-finite view values with defaults", () => {
+		const bt = deserializeBowtie(
+			JSON.stringify({
+				id: "a",
+				name: "b",
+				events: [{ id: "e1", label: "T", hazard: "H" }],
+				threats: [],
+				consequences: [],
+				view: { zoom: "nope", panX: null, panY: 0 },
+			})
+		);
+		expect(bt.view).toEqual({ zoom: 1, panX: 0, panY: 0 });
+	});
+});
+
+describe("sanitizeBaseName", () => {
+	it("strips separators and illegal characters", () => {
+		expect(sanitizeBaseName("a/b:c*?")).toBe("a-b-c--");
+	});
+
+	it("falls back for bare dot names", () => {
+		expect(sanitizeBaseName("..")).toBe("bowtie");
+		expect(sanitizeBaseName("   ")).toBe("bowtie");
+	});
+
+	it("strips trailing dots and spaces", () => {
+		expect(sanitizeBaseName("My bowtie. ")).toBe("My bowtie");
+	});
+
+	it("escapes Windows reserved names", () => {
+		expect(sanitizeBaseName("CON")).toBe("_CON");
+		expect(sanitizeBaseName("lpt1")).toBe("_lpt1");
 	});
 });
 

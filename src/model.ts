@@ -247,10 +247,27 @@ export function deserializeBowtie(json: string): Bowtie {
 	const raw = JSON.parse(json) as Bowtie & { topEvent?: string; hazard?: string };
 	migrateLegacyBowtie(raw);
 	validateBowtie(raw);
-	if (!raw.view) {
-		raw.view = { zoom: 1, panX: 0, panY: 0 };
-	}
+	raw.view = sanitizeViewState(raw.view);
 	return raw;
+}
+
+const VIEW_MIN_ZOOM = 0.2;
+const VIEW_MAX_ZOOM = 3;
+
+function sanitizeNumber(value: unknown, fallback: number): number {
+	return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function sanitizeViewState(view: BowtieViewState | undefined): BowtieViewState {
+	if (!view || typeof view !== "object") {
+		return { zoom: 1, panX: 0, panY: 0 };
+	}
+	const zoom = sanitizeNumber(view.zoom, 1);
+	return {
+		zoom: Math.min(VIEW_MAX_ZOOM, Math.max(VIEW_MIN_ZOOM, zoom)),
+		panX: sanitizeNumber(view.panX, 0),
+		panY: sanitizeNumber(view.panY, 0),
+	};
 }
 
 function migrateLegacyBowtie(data: Bowtie & { topEvent?: string; hazard?: string }): void {
@@ -379,11 +396,23 @@ function validateBowtie(data: Bowtie): void {
 		}
 	}
 	for (const threat of data.threats) {
+		if (typeof threat.label !== "string") {
+			threat.label = "";
+		}
+		if (!Array.isArray(threat.preventionBarriers)) {
+			threat.preventionBarriers = [];
+		}
 		for (const barrier of threat.preventionBarriers) {
 			normalizeBarrier(barrier);
 		}
 	}
 	for (const consequence of data.consequences) {
+		if (typeof consequence.label !== "string") {
+			consequence.label = "";
+		}
+		if (!Array.isArray(consequence.mitigationBarriers)) {
+			consequence.mitigationBarriers = [];
+		}
 		for (const barrier of consequence.mitigationBarriers) {
 			normalizeBarrier(barrier);
 		}
@@ -396,6 +425,27 @@ export function hasSafeguardChain(barrier: Barrier): boolean {
 
 export function getBowtieFilePath(basePath: string): string {
 	return `${basePath}${BOWTIE_EXTENSION}`;
+}
+
+const WINDOWS_RESERVED_NAMES = new Set([
+	"CON", "PRN", "AUX", "NUL",
+	"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+]);
+
+/**
+ * Produce a safe base file name (no extension): strips illegal/separator
+ * characters, control characters, and leading/trailing dots/spaces, rejects
+ * bare "." / "..", and avoids Windows reserved device names.
+ */
+export function sanitizeBaseName(name: string, fallback = "bowtie"): string {
+	let result = name.replace(/[\\/:*?"<>|]/g, "-");
+	// eslint-disable-next-line no-control-regex
+	result = result.replace(/[\u0000-\u001f]/g, "");
+	result = result.replace(/^[\s.]+|[\s.]+$/g, "");
+	if (!result || result === "." || result === "..") return fallback;
+	if (WINDOWS_RESERVED_NAMES.has(result.toUpperCase())) return `_${result}`;
+	return result;
 }
 
 export function touchBowtie(bowtie: Bowtie): Bowtie {

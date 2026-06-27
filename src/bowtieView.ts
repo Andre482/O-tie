@@ -1273,7 +1273,13 @@ export class BowtieView extends TextFileView {
 		input.focus();
 		input.select();
 
+		// onCommit/cancel can detach the focused input (via render), which fires a
+		// trailing blur. Guard so commit/cancel run exactly once.
+		let finished = false;
+
 		const commit = () => {
+			if (finished) return;
+			finished = true;
 			const v = input.value.trim();
 			if (v && v !== initial) {
 				this.commitEdit();
@@ -1283,6 +1289,12 @@ export class BowtieView extends TextFileView {
 			}
 		};
 
+		const cancel = () => {
+			if (finished) return;
+			finished = true;
+			el.setText(initial);
+		};
+
 		input.addEventListener("blur", commit);
 		input.addEventListener("keydown", (e) => {
 			if (e.key === "Enter") {
@@ -1290,7 +1302,8 @@ export class BowtieView extends TextFileView {
 				commit();
 			}
 			if (e.key === "Escape") {
-				el.setText(initial);
+				e.preventDefault();
+				cancel();
 			}
 		});
 	}

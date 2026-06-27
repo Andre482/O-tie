@@ -7,6 +7,7 @@ import {
 	BOWTIE_VIEW_TYPE,
 	createBowtie,
 	getBowtieFilePath,
+	sanitizeBaseName,
 	serializeBowtie,
 } from "./model";
 import { DEFAULT_SETTINGS, OTieSettingTab, type OTieSettings } from "./settingsTab";
@@ -88,7 +89,7 @@ export default class OTiePlugin extends Plugin {
 	}
 
 	private sanitizeFileName(name: string): string {
-		return name.replace(/[\\/:*?"<>|]/g, "-").trim();
+		return sanitizeBaseName(name);
 	}
 
 	private async createNewBowtie(): Promise<void> {

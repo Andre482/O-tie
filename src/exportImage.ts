@@ -1,4 +1,5 @@
 import { toBlob } from "html-to-image";
+import { sanitizeBaseName } from "./model";
 
 export type BowtieExportArea = "full" | "viewport";
 
@@ -271,6 +272,5 @@ export function downloadPng(blob: Blob, filename: string): void {
 }
 
 export function sanitizeExportFilename(name: string): string {
-	const trimmed = name.trim() || "bowtie";
-	return trimmed.replace(/[\\/:*?"<>|]/g, "-");
+	return sanitizeBaseName(name);
 }
