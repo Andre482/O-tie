@@ -436,6 +436,20 @@ export class BowtieView extends TextFileView {
 		return btn;
 	}
 
+	private createInspectorBtn(
+		parent: HTMLElement,
+		label: string,
+		action: (e: MouseEvent) => void,
+		opts: { primary?: boolean; warning?: boolean } = {}
+	): HTMLButtonElement {
+		const cls = ["mod-small"];
+		if (opts.primary) cls.push("mod-cta");
+		if (opts.warning) cls.push("mod-warning");
+		const btn = parent.createEl("button", { cls: cls.join(" "), text: label });
+		btn.addEventListener("click", action);
+		return btn;
+	}
+
 	private renderInspector(): void {
 		this.inspectorEl.empty();
 		if (!this.selectedRef) {
@@ -493,23 +507,20 @@ export class BowtieView extends TextFileView {
 			this.selectedRef.kind === "mitigationBarrier" ||
 			this.selectedRef.kind === "transitionBarrier"
 		) {
-			const stackBtn = actions.createEl("button", { text: "+ stack row", cls: "mod-small" });
-			stackBtn.addEventListener("click", (e) => {
-				const rect = stackBtn.getBoundingClientRect();
+			this.createInspectorBtn(actions, "+ Stack row", (e) => {
+				const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 				this.showAddStackRowMenu(
 					{ clientX: rect.left, clientY: rect.bottom } as MouseEvent,
 					this.selectedRef!
 				);
 			});
-			const degBtn = actions.createEl("button", { text: "⚡ Degradation factor", cls: "mod-small" });
-			degBtn.addEventListener("click", () => {
+			this.createInspectorBtn(actions, "⚡ Degradation factor", () => {
 				this.addDegradationFactor(this.selectedRef!);
 			});
 		}
 
 		if (this.selectedRef.kind === "degradationFactor") {
-			const sgBtn = actions.createEl("button", { text: "+ safeguard", cls: "mod-small" });
-			sgBtn.addEventListener("click", () => {
+			this.createInspectorBtn(actions, "+ Safeguard", () => {
 				this.addSafeguard(this.selectedRef!);
 			});
 		}
@@ -517,34 +528,47 @@ export class BowtieView extends TextFileView {
 		if (this.selectedRef.kind === "topEvent" && this.selectedRef.eventId) {
 			const eventIndex = this.bowtie.events.findIndex((e) => e.id === this.selectedRef!.eventId);
 			if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
-				const barBtn = actions.createEl("button", {
-					text: "+ barrier to next event",
-					cls: "mod-cta mod-small",
-				});
-				barBtn.addEventListener("click", () => {
-					this.addTransitionBarrier(this.selectedRef!.eventId!);
-				});
+				this.createInspectorBtn(
+					actions,
+					"+ Barrier to next event",
+					() => {
+						this.addTransitionBarrier(this.selectedRef!.eventId!);
+					},
+					{ primary: true }
+				);
 			}
 		}
 
 		if (this.selectedRef.kind === "threat") {
-			const barBtn = actions.createEl("button", { text: "+ prevention barrier", cls: "mod-cta mod-small" });
-			barBtn.addEventListener("click", () => {
-				this.addPreventionBarrier(this.selectedRef!.threatId!);
-			});
+			this.createInspectorBtn(
+				actions,
+				"+ Prevention Barrier",
+				() => {
+					this.addPreventionBarrier(this.selectedRef!.threatId!);
+				},
+				{ primary: true }
+			);
 		}
 
 		if (this.selectedRef.kind === "consequence") {
-			const barBtn = actions.createEl("button", { text: "+ mitigation barrier", cls: "mod-cta mod-small" });
-			barBtn.addEventListener("click", () => {
-				this.addMitigationBarrier(this.selectedRef!.consequenceId!);
-			});
+			this.createInspectorBtn(
+				actions,
+				"+ Mitigation Barrier",
+				() => {
+					this.addMitigationBarrier(this.selectedRef!.consequenceId!);
+				},
+				{ primary: true }
+			);
 		}
 
-		const delBtn = actions.createEl("button", { text: "Delete", cls: "mod-warning mod-small" });
-		delBtn.addEventListener("click", () => {
-			this.deleteNode(this.selectedRef!);
-		});
+		this.createInspectorBtn(
+			actions,
+			"Delete",
+			() => {
+				this.deleteNode(this.selectedRef!);
+			},
+			{ warning: true }
+		);
 	}
 
 	private fitInspectorTextArea(textarea: HTMLTextAreaElement): void {
@@ -1442,11 +1466,17 @@ export class BowtieView extends TextFileView {
 			}
 
 			if (e.pointerId === this.panPointerId) {
+				const tappedEmptyCanvas = !this.gestureMoved && !this.panStartedOnNode;
 				if (this.gestureMoved && this.panStartedOnNode) {
 					this.suppressNextClick = true;
 				}
 				this.panStartedOnNode = false;
 				this.endPan();
+				// Touch taps on empty canvas call preventDefault on pointerdown, so no click
+				// event fires to clear selection — dismiss the inspector on tap-up instead.
+				if (tappedEmptyCanvas) {
+					this.clearSelection();
+				}
 			}
 
 			if (this.activePointers.size === 1) {

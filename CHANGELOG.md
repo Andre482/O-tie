@@ -2,6 +2,15 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.13] — 2026-06-28
+
+### Fixed
+
+- **Mobile inspector dismiss** — Tapping empty canvas on phone or tablet now closes the inspector bar, matching desktop click-away behaviour.
+- **Inspector action labels** — + Stack row, + Safeguard, + Barrier, and related buttons use capitalised labels consistent with the toolbar.
+
+---
+
 ## [1.0.12] — 2026-06-27
 
 ### Fixed

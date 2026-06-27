@@ -1,7 +1,7 @@
 {
 	"id": "o-tie",
 	"name": "O-Tie",
-	"version": "1.0.12",
+	"version": "1.0.13",
 	"minAppVersion": "1.4.0",
 	"description": "Build risk bowtie diagrams in your vault: threats, prevention and mitigation barriers, escalation factors, barrier analysis stacks, and PNG export.",
 	"author": "Andre482",
