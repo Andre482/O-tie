@@ -1,67 +1,89 @@
 {
-  "id": "example-steamcracker",
-  "name": "Defective Steamcracker",
-  "hazard": "High pressure ethylene cracking system",
-  "topEvent": "Loss of containment in steamcracker furnace",
+  "id": "bowtie-0",
+  "name": "Defective steamcracker",
+  "events": [
+    {
+      "id": "event-1",
+      "label": "Loss of containment in steamcracker furnace",
+      "hazard": "High-pressure ethylene cracking system",
+      "transitionBarriers": []
+    }
+  ],
   "threats": [
     {
-      "id": "threat-1",
+      "id": "threat-2",
       "label": "Tube corrosion / fatigue",
       "preventionBarriers": [
         {
-          "id": "pb-1",
+          "id": "barrier-3",
           "label": "Periodic tube inspection program",
-          "escalationFactors": []
+          "degradationChains": [],
+          "stack": [],
+          "stackCollapsed": true
         },
         {
-          "id": "pb-2",
+          "id": "barrier-4",
           "label": "Material selection standards",
-          "escalationFactors": []
+          "degradationChains": [],
+          "stack": [],
+          "stackCollapsed": true
         }
       ]
     },
     {
-      "id": "threat-2",
+      "id": "threat-5",
       "label": "Operator error during startup",
       "preventionBarriers": [
         {
-          "id": "pb-3",
+          "id": "barrier-6",
           "label": "Standard operating procedures",
-          "escalationFactors": []
+          "degradationChains": [],
+          "stack": [],
+          "stackCollapsed": true
         }
       ]
     }
   ],
   "consequences": [
     {
-      "id": "consequence-1",
+      "id": "consequence-7",
       "label": "Fire / explosion",
       "mitigationBarriers": [
         {
-          "id": "mb-1",
+          "id": "barrier-8",
           "label": "Deluge and fire suppression systems",
-          "escalationFactors": []
+          "degradationChains": [],
+          "stack": [],
+          "stackCollapsed": true
         }
       ]
     },
     {
-      "id": "consequence-2",
+      "id": "consequence-9",
       "label": "Toxic gas release",
       "mitigationBarriers": [
         {
-          "id": "mb-2",
+          "id": "barrier-10",
           "label": "Gas detection and isolation",
-          "escalationFactors": []
+          "degradationChains": [],
+          "stack": [],
+          "stackCollapsed": true
         },
         {
-          "id": "mb-3",
+          "id": "barrier-11",
           "label": "Emergency response plan",
-          "escalationFactors": []
+          "degradationChains": [],
+          "stack": [],
+          "stackCollapsed": true
         }
       ]
     }
   ],
-  "view": { "zoom": 1, "panX": 0, "panY": 0 },
-  "createdAt": "2026-06-09T00:00:00.000Z",
-  "updatedAt": "2026-06-09T00:00:00.000Z"
+  "view": {
+    "zoom": 1,
+    "panX": 0,
+    "panY": 0
+  },
+  "createdAt": "2026-06-12T00:00:00.000Z",
+  "updatedAt": "2026-06-12T00:00:00.000Z"
 }

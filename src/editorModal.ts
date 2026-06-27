@@ -11,13 +11,13 @@ export class NewBowtieNameModal extends Modal {
 	onOpen(): void {
 		const { contentEl, modalEl } = this;
 		modalEl.addClass("o-tie-modal");
-		contentEl.createEl("h2", { text: "Create New Bowtie" });
+		contentEl.createEl("h2", { text: "Create new bowtie" });
 
 		new Setting(contentEl)
 			.setName("Bowtie name")
 			.setDesc("Used for the file name and diagram title")
 			.addText((text) => {
-				text.setPlaceholder("e.g. Defective Steamcracker");
+				text.setPlaceholder("E.g. Defective steamcracker");
 				text.inputEl.addEventListener("keydown", (e) => {
 					if (e.key === "Enter") this.submit(text.getValue());
 				});

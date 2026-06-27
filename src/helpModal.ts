@@ -11,7 +11,7 @@ export class HelpModal extends Modal {
 	onOpen(): void {
 		const { contentEl, modalEl } = this;
 		modalEl.addClass("o-tie-modal", "o-tie-help-modal");
-		contentEl.createEl("h2", { text: "O-Tie Help" });
+		contentEl.createEl("h2", { text: "Help" });
 
 		contentEl.createEl("p", {
 			cls: "o-tie-help-version",

@@ -4,6 +4,18 @@ Build and edit **risk bowtie diagrams** in Obsidian with an interactive visual e
 
 Diagrams are stored as `.bowtie` files in your vault and auto-save as you edit.
 
+## Screenshots
+
+![O-Tie editor showing a bowtie with threats, prevention and mitigation barriers, a central top event, consequences, an escalation chain, and a colour-coded barrier analysis stack](assets/screenshot-diagram.png)
+
+*A bowtie for a cold-storage ammonia loss-of-primary-containment scenario.*
+
+![A prevention barrier with its full analysis stack — type, effectiveness, criticality, responsible party, validation method, and status — plus a safeguard and degradation factor below it](assets/screenshot-barrier.png)
+
+*Per-barrier analysis stacks and escalation factors (safeguards and degradation factors).*
+
+> Regenerate these images with `npm run screenshots` (requires `npx playwright install chromium` once).
+
 ## Features
 
 - Interactive bowtie editor with fan-in/fan-out layout
@@ -82,20 +94,49 @@ After updating O-Tie on desktop, let Obsidian Sync finish, then reload Obsidian 
 
 ## File format
 
-`.bowtie` files are JSON. Example:
+`.bowtie` files are JSON. The hazard and top event live inside `events`, and barriers can carry escalation chains and an analysis `stack`:
 
 ```json
 {
-  "name": "Defective Steamcracker",
-  "hazard": "High pressure ethylene",
-  "topEvent": "Loss of containment",
-  "threats": [{ "label": "Corrosion", "preventionBarriers": [] }],
-  "consequences": [{ "label": "Fire", "mitigationBarriers": [] }],
-  "view": { "zoom": 1, "panX": 0, "panY": 0 }
+  "id": "b1f2…",
+  "name": "Defective steamcracker",
+  "events": [
+    {
+      "id": "ev1",
+      "label": "Loss of containment",
+      "hazard": "High-pressure ethylene",
+      "transitionBarriers": []
+    }
+  ],
+  "threats": [
+    {
+      "id": "t1",
+      "label": "Tube corrosion / fatigue",
+      "preventionBarriers": [
+        {
+          "id": "pb1",
+          "label": "Mechanical integrity inspection",
+          "degradationChains": [],
+          "stack": [
+            { "id": "s1", "field": "type", "label": "Active Hardware", "color": "#48c9b0" }
+          ],
+          "stackCollapsed": false
+        }
+      ]
+    }
+  ],
+  "consequences": [
+    { "id": "c1", "label": "Fire / explosion", "mitigationBarriers": [] }
+  ],
+  "view": { "zoom": 1, "panX": 0, "panY": 0 },
+  "createdAt": "2026-06-12T00:00:00.000Z",
+  "updatedAt": "2026-06-12T00:00:00.000Z"
 }
 ```
 
-See [examples/steamcracker.bowtie](examples/steamcracker.bowtie) and [examples/cold-storage-ammonia.bowtie](examples/cold-storage-ammonia.bowtie) (LinkedIn promo scenario).
+Files written by older versions (with top-level `hazard`/`topEvent` and barrier `escalationFactors`) are migrated automatically on open.
+
+See [examples/steamcracker.bowtie](examples/steamcracker.bowtie) and [examples/cold-storage-ammonia.bowtie](examples/cold-storage-ammonia.bowtie).
 
 ## Changelog
 
@@ -105,10 +146,15 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ```bash
 npm install
-npm run dev    # watch mode
-npm run build  # production build
-npm run lint   # Obsidian plugin guidelines check
+npm run dev        # watch mode
+npm run build      # production build
+npm run lint       # Obsidian plugin guidelines check
+npm test           # unit tests (model + layout)
+npm run screenshots # regenerate README images (needs: npx playwright install chromium)
+npm run examples   # regenerate example .bowtie files
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, asset regeneration, and the release/QA checklist.
 
 ## Third-party licenses
 

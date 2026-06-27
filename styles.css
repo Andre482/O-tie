@@ -1,3 +1,9 @@
+/* Settings */
+.o-tie-setting-invalid {
+	border-color: var(--text-error) !important;
+	box-shadow: 0 0 0 1px var(--text-error);
+}
+
 /* Modal (create bowtie) */
 .o-tie-modal {
 	max-width: 480px;

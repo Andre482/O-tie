@@ -1,4 +1,4 @@
-import { Menu, Notice, Platform, TextFileView, TFile, WorkspaceLeaf, setIcon } from "obsidian";
+import { Menu, Notice, Platform, TextFileView, WorkspaceLeaf, setIcon } from "obsidian";
 import { ExportImageModal } from "./exportImageModal";
 import { HelpModal } from "./helpModal";
 import type { BowtieExportViewport } from "./exportImage";
@@ -22,7 +22,6 @@ import {
 	BOWTIE_VIEW_TYPE,
 	createBarrier,
 	createBarrierStackItem,
-	cloneBowtie,
 	createBowtie,
 	createConsequence,
 	createDegradationChain,
@@ -37,52 +36,11 @@ import {
 	serializeBowtie,
 	sortBarrierStack,
 	touchBowtie,
-	bowtieStructureSignature,
 } from "./model";
-
-const STACK_ROW_COLOR_OPTIONS: { color: string; label: string }[] = [
-	{ color: "#5dade2", label: "Sky blue" },
-	{ color: "#3498db", label: "Blue" },
-	{ color: "#48c9b0", label: "Teal" },
-	{ color: "#1abc9c", label: "Mint" },
-	{ color: "#7f8c8d", label: "Gray" },
-	{ color: "#1e8449", label: "Dark green" },
-	{ color: "#27ae60", label: "Green" },
-	{ color: "#f1c40f", label: "Yellow" },
-	{ color: "#e67e22", label: "Orange" },
-	{ color: "#c0392b", label: "Red" },
-	{ color: "#2c3e50", label: "Navy" },
-	{ color: "#566573", label: "Slate" },
-	{ color: "#ffffff", label: "White" },
-	{ color: "#f4ecf7", label: "Light purple" },
-	{ color: "#eafaf1", label: "Light green" },
-];
-
-const LIGHT_STACK_ROW_COLORS = new Set(["#ffffff", "#f4ecf7", "#eafaf1"]);
-
-function isLightStackColor(color: string): boolean {
-	if (LIGHT_STACK_ROW_COLORS.has(color)) return true;
-	const match = /^#([0-9a-f]{6})$/i.exec(color);
-	if (!match) return false;
-	const n = parseInt(match[1], 16);
-	const r = (n >> 16) & 0xff;
-	const g = (n >> 8) & 0xff;
-	const b = n & 0xff;
-	const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-	return luminance > 0.62;
-}
-
-function createColorMenuTitle(color: string, label: string): DocumentFragment {
-	const frag = activeDocument.createDocumentFragment();
-	const wrap = frag.createEl("span", { cls: "o-tie-color-menu-title" });
-	const swatch = wrap.createEl("span", { cls: "o-tie-color-swatch" });
-	swatch.setCssStyles({ backgroundColor: color });
-	if (LIGHT_STACK_ROW_COLORS.has(color)) {
-		swatch.addClass("o-tie-color-swatch-light");
-	}
-	wrap.createEl("span", { cls: "o-tie-color-menu-label", text: label });
-	return frag;
-}
+import { ExternalSync } from "./externalSync";
+import { BowtieHistory } from "./history";
+import { computeFit, computeZoomAt, normalizeWheelDelta, wheelFactorFromDelta } from "./panZoom";
+import { STACK_ROW_COLOR_OPTIONS, createColorMenuTitle, isLightStackColor } from "./stackRows";
 
 export { BOWTIE_VIEW_TYPE };
 
@@ -105,6 +63,9 @@ export class BowtieView extends TextFileView {
 	private panPointerId: number | null = null;
 	private activePointers = new Map<number, { x: number; y: number }>();
 	private pinchLastDistance: number | null = null;
+	private gestureMoved = false;
+	private panStartedOnNode = false;
+	private suppressNextClick = false;
 	private saveTimeout: number | null = null;
 	private viewSaveTimeout: number | null = null;
 	private viewShellReady = false;
@@ -125,14 +86,13 @@ export class BowtieView extends TextFileView {
 	private toolbarCollapsed = false;
 	private undoBtn: HTMLButtonElement | null = null;
 	private redoBtn: HTMLButtonElement | null = null;
-	private undoStack: Bowtie[] = [];
-	private redoStack: Bowtie[] = [];
-	private undoSelectionStack: (NodeRef | null)[] = [];
-	private redoSelectionStack: (NodeRef | null)[] = [];
+	private history = new BowtieHistory(BowtieView.MAX_UNDO);
 	private isRestoringHistory = false;
 	private static readonly MAX_UNDO = 50;
 	private static readonly GRID_SIZE = 20;
 	private stackCollapseBackup: Map<string, boolean> | null = null;
+	private loadError = false;
+	private rawData: string | null = null;
 
 	private get useCssZoom(): boolean {
 		// CSS zoom distorts border-radius on child buttons in mobile WebKit.
@@ -166,6 +126,11 @@ export class BowtieView extends TextFileView {
 	}
 
 	getViewData(): string {
+		// Preserve the original bytes of a file we could not parse so autosave
+		// never overwrites a malformed (but potentially recoverable) file.
+		if (this.loadError && this.rawData !== null) {
+			return this.rawData;
+		}
 		return serializeBowtie(this.bowtie);
 	}
 
@@ -173,8 +138,15 @@ export class BowtieView extends TextFileView {
 		if (clear) this.clear();
 		try {
 			this.bowtie = deserializeBowtie(data);
+			this.loadError = false;
+			this.rawData = null;
 		} catch {
+			this.loadError = true;
+			this.rawData = data;
 			this.bowtie = createBowtie("Untitled");
+			new Notice(
+				"Could not read this .bowtie file — it may be malformed. The file has not been changed; editing here will overwrite it."
+			);
 		}
 		this.resetHistory();
 		this.render();
@@ -188,6 +160,8 @@ export class BowtieView extends TextFileView {
 		this.toolbarTitleEl = null;
 		this.undoBtn = null;
 		this.redoBtn = null;
+		this.loadError = false;
+		this.rawData = null;
 		this.resetHistory();
 	}
 
@@ -235,29 +209,22 @@ export class BowtieView extends TextFileView {
 	}
 
 	private resetHistory(): void {
-		this.undoStack = [];
-		this.redoStack = [];
-		this.undoSelectionStack = [];
-		this.redoSelectionStack = [];
+		this.history.reset();
 		this.updateUndoRedoButtons();
 	}
 
 	private commitEdit(): void {
 		if (this.isRestoringHistory) return;
-		this.undoStack.push(cloneBowtie(this.bowtie));
-		this.undoSelectionStack.push(this.selectedRef ? { ...this.selectedRef } : null);
-		if (this.undoStack.length > BowtieView.MAX_UNDO) {
-			this.undoStack.shift();
-			this.undoSelectionStack.shift();
-		}
-		this.redoStack = [];
-		this.redoSelectionStack = [];
+		// A deliberate user edit takes ownership of the file; allow saves again.
+		this.loadError = false;
+		this.rawData = null;
+		this.history.record(this.bowtie, this.selectedRef);
 		this.updateUndoRedoButtons();
 	}
 
 	private updateUndoRedoButtons(): void {
-		if (this.undoBtn) this.undoBtn.disabled = this.undoStack.length === 0;
-		if (this.redoBtn) this.redoBtn.disabled = this.redoStack.length === 0;
+		if (this.undoBtn) this.undoBtn.disabled = !this.history.canUndo;
+		if (this.redoBtn) this.redoBtn.disabled = !this.history.canRedo;
 	}
 
 	private nodeRefExists(ref: NodeRef): boolean {
@@ -294,21 +261,15 @@ export class BowtieView extends TextFileView {
 	}
 
 	private undo(): void {
-		if (this.undoStack.length === 0) return;
-		this.redoStack.push(cloneBowtie(this.bowtie));
-		this.redoSelectionStack.push(this.selectedRef ? { ...this.selectedRef } : null);
-		const snapshot = this.undoStack.pop()!;
-		const selectedRef = this.undoSelectionStack.pop() ?? null;
-		this.restoreHistorySnapshot(snapshot, selectedRef);
+		const snapshot = this.history.undo(this.bowtie, this.selectedRef);
+		if (!snapshot) return;
+		this.restoreHistorySnapshot(snapshot.bowtie, snapshot.selection);
 	}
 
 	private redo(): void {
-		if (this.redoStack.length === 0) return;
-		this.undoStack.push(cloneBowtie(this.bowtie));
-		this.undoSelectionStack.push(this.selectedRef ? { ...this.selectedRef } : null);
-		const snapshot = this.redoStack.pop()!;
-		const selectedRef = this.redoSelectionStack.pop() ?? null;
-		this.restoreHistorySnapshot(snapshot, selectedRef);
+		const snapshot = this.history.redo(this.bowtie, this.selectedRef);
+		if (!snapshot) return;
+		this.restoreHistorySnapshot(snapshot.bowtie, snapshot.selection);
 	}
 
 	private render(): void {
@@ -392,10 +353,10 @@ export class BowtieView extends TextFileView {
 		this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-separator" });
 
 		const addGroup = this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-group" });
-		this.createToolbarBtn(addGroup, "+ Threat", () => this.addThreat(), { primary: true });
-		this.createToolbarBtn(addGroup, "+ Consequence", () => this.addConsequence(), { primary: true });
-		this.createToolbarBtn(addGroup, "+ Event", () => this.addTopEvent(), { primary: true });
-		this.createToolbarBtn(addGroup, "+ Barrier", () => this.addBarrierToSelection());
+		this.createToolbarBtn(addGroup, "+ threat", () => this.addThreat(), { primary: true });
+		this.createToolbarBtn(addGroup, "+ consequence", () => this.addConsequence(), { primary: true });
+		this.createToolbarBtn(addGroup, "+ event", () => this.addTopEvent(), { primary: true });
+		this.createToolbarBtn(addGroup, "+ barrier", () => this.addBarrierToSelection());
 
 		this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-separator" });
 
@@ -524,7 +485,7 @@ export class BowtieView extends TextFileView {
 			this.selectedRef.kind === "mitigationBarrier" ||
 			this.selectedRef.kind === "transitionBarrier"
 		) {
-			const stackBtn = actions.createEl("button", { text: "+ Stack row", cls: "mod-small" });
+			const stackBtn = actions.createEl("button", { text: "+ stack row", cls: "mod-small" });
 			stackBtn.addEventListener("click", (e) => {
 				const rect = stackBtn.getBoundingClientRect();
 				this.showAddStackRowMenu(
@@ -539,7 +500,7 @@ export class BowtieView extends TextFileView {
 		}
 
 		if (this.selectedRef.kind === "degradationFactor") {
-			const sgBtn = actions.createEl("button", { text: "+ Safeguard", cls: "mod-small" });
+			const sgBtn = actions.createEl("button", { text: "+ safeguard", cls: "mod-small" });
 			sgBtn.addEventListener("click", () => {
 				this.addSafeguard(this.selectedRef!);
 			});
@@ -549,7 +510,7 @@ export class BowtieView extends TextFileView {
 			const eventIndex = this.bowtie.events.findIndex((e) => e.id === this.selectedRef!.eventId);
 			if (eventIndex >= 0 && eventIndex < this.bowtie.events.length - 1) {
 				const barBtn = actions.createEl("button", {
-					text: "+ Barrier to next event",
+					text: "+ barrier to next event",
 					cls: "mod-cta mod-small",
 				});
 				barBtn.addEventListener("click", () => {
@@ -559,14 +520,14 @@ export class BowtieView extends TextFileView {
 		}
 
 		if (this.selectedRef.kind === "threat") {
-			const barBtn = actions.createEl("button", { text: "+ Prevention Barrier", cls: "mod-cta mod-small" });
+			const barBtn = actions.createEl("button", { text: "+ prevention barrier", cls: "mod-cta mod-small" });
 			barBtn.addEventListener("click", () => {
 				this.addPreventionBarrier(this.selectedRef!.threatId!);
 			});
 		}
 
 		if (this.selectedRef.kind === "consequence") {
-			const barBtn = actions.createEl("button", { text: "+ Mitigation Barrier", cls: "mod-cta mod-small" });
+			const barBtn = actions.createEl("button", { text: "+ mitigation barrier", cls: "mod-cta mod-small" });
 			barBtn.addEventListener("click", () => {
 				this.addMitigationBarrier(this.selectedRef!.consequenceId!);
 			});
@@ -593,7 +554,7 @@ export class BowtieView extends TextFileView {
 		});
 		this.svgEl.setAttribute("width", String(layout.bounds.width));
 		this.svgEl.setAttribute("height", String(layout.bounds.height));
-		this.svgEl.innerHTML = "";
+		this.svgEl.replaceChildren();
 
 		for (const edge of layout.edges) {
 			const path = activeDocument.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -630,6 +591,28 @@ export class BowtieView extends TextFileView {
 		head.setAttribute("d", `M0 0 L-${size} ${-size * 0.42} L-${size} ${size * 0.42} Z`);
 		group.appendChild(head);
 		this.svgEl.appendChild(group);
+	}
+
+	private selectNodeElement(ref: NodeRef, wrap: HTMLElement): void {
+		this.selectedRef = ref;
+		this.renderInspector();
+		this.nodesEl.querySelectorAll(".o-tie-node-wrap").forEach((n) => {
+			n.removeClass("o-tie-node-selected");
+			n.setAttribute("aria-pressed", "false");
+		});
+		wrap.addClass("o-tie-node-selected");
+		wrap.setAttribute("aria-pressed", "true");
+		this.updateOverlayVisibility();
+	}
+
+	private clearSelection(): void {
+		this.selectedRef = null;
+		this.renderInspector();
+		this.nodesEl.querySelectorAll(".o-tie-node-wrap").forEach((n) => {
+			n.removeClass("o-tie-node-selected");
+			n.setAttribute("aria-pressed", "false");
+		});
+		this.updateOverlayVisibility();
 	}
 
 	private renderNode(node: PositionedNode): void {
@@ -812,14 +795,28 @@ export class BowtieView extends TextFileView {
 		}
 		}
 
+		wrap.tabIndex = 0;
+		wrap.setAttribute("role", "button");
+		wrap.setAttribute("aria-label", node.label?.trim() ? `${node.subtitle}: ${node.label}` : node.subtitle);
+		wrap.setAttribute("aria-pressed", this.isNodeSelected(node.ref) ? "true" : "false");
+
 		wrap.addEventListener("click", (e) => {
 			if ((e.target as HTMLElement).closest("button, [role='button']")) return;
 			e.stopPropagation();
-			this.selectedRef = node.ref;
-			this.renderInspector();
-			this.nodesEl.querySelectorAll(".o-tie-node-wrap").forEach((n) => n.removeClass("o-tie-node-selected"));
-			wrap.addClass("o-tie-node-selected");
-			this.updateOverlayVisibility();
+			this.selectNodeElement(node.ref, wrap);
+		});
+
+		wrap.addEventListener("keydown", (e) => {
+			if (e.target !== wrap) return;
+			if (e.key === "Enter" || e.key === " ") {
+				e.preventDefault();
+				e.stopPropagation();
+				this.selectNodeElement(node.ref, wrap);
+			} else if (e.key === "Escape") {
+				e.stopPropagation();
+				this.clearSelection();
+				wrap.blur();
+			}
 		});
 
 		if (!isBarrier) {
@@ -1324,10 +1321,19 @@ export class BowtieView extends TextFileView {
 			this.containerEl_,
 			"pointerdown",
 			(e) => {
+				// A click only ever follows immediately after the previous pointerup;
+				// clear any stale suppression flag at the start of a new gesture.
+				this.suppressNextClick = false;
 				const target = e.target as HTMLElement;
-				if (!this.isPanZoomTarget(target)) return;
+				const isTouch = e.pointerType === "touch" || e.pointerType === "pen";
+				const onEmptyCanvas = this.isPanZoomTarget(target);
+				// On touch/pen, let a single-finger drag pan from anywhere on the
+				// canvas (including on top of a node), as long as the finger isn't on
+				// an interactive control. A tap still selects the node (see pointerup).
+				const fromNode = isTouch && !onEmptyCanvas && !this.isInteractiveControl(target);
+				if (!onEmptyCanvas && !fromNode) return;
 
-				if (e.pointerType === "touch" || e.pointerType === "pen") {
+				if (isTouch && onEmptyCanvas) {
 					e.preventDefault();
 					e.stopPropagation();
 				}
@@ -1343,6 +1349,8 @@ export class BowtieView extends TextFileView {
 				if (this.activePointers.size === 1) {
 					this.panPointerId = e.pointerId;
 					this.pinchLastDistance = null;
+					this.gestureMoved = false;
+					this.panStartedOnNode = fromNode;
 					this.containerEl_.setPointerCapture(e.pointerId);
 					this.startPan(e.clientX, e.clientY);
 				}
@@ -1388,6 +1396,12 @@ export class BowtieView extends TextFileView {
 			}
 
 			if (e.pointerId === this.panPointerId) {
+				// A drag that began on a node must not also fire the node's tap-select
+				// click. A pure tap (no movement) falls through and selects normally.
+				if (this.gestureMoved && this.panStartedOnNode) {
+					this.suppressNextClick = true;
+				}
+				this.panStartedOnNode = false;
 				this.endPan();
 			}
 
@@ -1458,19 +1472,29 @@ export class BowtieView extends TextFileView {
 					const dy = this.wheelDeltaAccum;
 					this.wheelDeltaAccum = 0;
 					if (Math.abs(dy) < 0.01) return;
-					const factor = this.wheelFactorFromDelta(dy, this.wheelCtrlKey);
+					const factor = wheelFactorFromDelta(dy, this.wheelCtrlKey);
 					this.zoomAt(this.wheelClient.x, this.wheelClient.y, factor);
 				});
 			},
 			{ passive: false }
 		);
 
+		this.registerDomEvent(
+			this.containerEl_,
+			"click",
+			(e) => {
+				if (this.suppressNextClick) {
+					this.suppressNextClick = false;
+					e.stopPropagation();
+					e.preventDefault();
+				}
+			},
+			{ capture: true }
+		);
+
 		this.registerDomEvent(this.containerEl_, "click", (e) => {
 			if ((e.target as HTMLElement).closest(".o-tie-node-wrap")) return;
-			this.selectedRef = null;
-			this.renderInspector();
-			this.nodesEl.querySelectorAll(".o-tie-node-wrap").forEach((n) => n.removeClass("o-tie-node-selected"));
-			this.updateOverlayVisibility();
+			this.clearSelection();
 		});
 
 		this.registerDomEvent(activeDocument, "keydown", (e) => {
@@ -1503,22 +1527,12 @@ export class BowtieView extends TextFileView {
 	}
 
 	private normalizeWheelDelta(e: WheelEvent): number {
-		let dy = e.deltaY;
-		if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-			dy *= 16;
-		} else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-			dy *= this.containerEl_.clientHeight || window.innerHeight;
-		}
-		return dy;
-	}
-
-	private wheelFactorFromDelta(deltaY: number, ctrlKey: boolean): number {
-		// Gentler zoom: ~5% per mouse-wheel notch, smooth trackpad pinch.
-		const sensitivity = ctrlKey ? 0.0012 : 0.00045;
-		const factor = Math.exp(-deltaY * sensitivity);
-		const maxStep = ctrlKey ? 1.08 : 1.06;
-		const minStep = 1 / maxStep;
-		return Math.max(minStep, Math.min(maxStep, factor));
+		return normalizeWheelDelta(
+			e.deltaY,
+			e.deltaMode,
+			16,
+			this.containerEl_.clientHeight || window.innerHeight
+		);
 	}
 
 	private applyTransform(): void {
@@ -1564,35 +1578,17 @@ export class BowtieView extends TextFileView {
 		if (this.externalSyncReady) return;
 		this.externalSyncReady = true;
 
-		this.registerEvent(
-			this.app.vault.on("modify", (file) => {
-				if (!(file instanceof TFile) || file !== this.file) return;
-				if (Date.now() - this.lastSelfSaveAt < 3000) return;
-				void this.handleExternalFileChange(file);
-			})
-		);
-	}
-
-	private async handleExternalFileChange(file: TFile): Promise<void> {
-		const disk = await this.app.vault.read(file);
-		if (disk === this.data || disk === this.getViewData()) return;
-
-		let diskBowtie: Bowtie;
-		let localBowtie: Bowtie;
-		try {
-			diskBowtie = deserializeBowtie(disk);
-			localBowtie = this.bowtie;
-		} catch {
-			return;
-		}
-
-		if (bowtieStructureSignature(diskBowtie) === bowtieStructureSignature(localBowtie)) {
-			return;
-		}
-
-		if (this.saveTimeout !== null) return;
-
-		this.setViewData(disk, false);
+		new ExternalSync({
+			app: this.app,
+			getFile: () => this.file,
+			getLocalBowtie: () => this.bowtie,
+			getViewData: () => this.getViewData(),
+			getLocalData: () => this.data,
+			hasPendingSave: () => this.saveTimeout !== null,
+			getLastSelfSaveAt: () => this.lastSelfSaveAt,
+			applyDiskData: (disk) => this.setViewData(disk, false),
+			registerEvent: (ref) => this.registerEvent(ref),
+		}).start();
 	}
 
 	private worldToScreen(wx: number, wy: number): { x: number; y: number } {
@@ -1727,14 +1723,17 @@ export class BowtieView extends TextFileView {
 		e.stopPropagation();
 	}
 
-	private isPanZoomTarget(target: HTMLElement): boolean {
-		return !(
-			target.closest(".o-tie-node-wrap") ||
+	private isInteractiveControl(target: HTMLElement): boolean {
+		return !!(
 			target.closest(".o-tie-controls-overlay") ||
 			target.closest(".o-tie-lane-add") ||
 			target.closest("button") ||
 			target.closest('[role="button"]')
 		);
+	}
+
+	private isPanZoomTarget(target: HTMLElement): boolean {
+		return !(target.closest(".o-tie-node-wrap") || this.isInteractiveControl(target));
 	}
 
 	private blockCanvasGesture(e: Event): void {
@@ -1757,6 +1756,7 @@ export class BowtieView extends TextFileView {
 		if (!this.isPanning) return;
 		const dx = clientX - this.panStart.x;
 		const dy = clientY - this.panStart.y;
+		if (!this.gestureMoved && Math.hypot(dx, dy) > 6) this.gestureMoved = true;
 		if (!this.bowtie.view) this.bowtie.view = { zoom: 1, panX: 0, panY: 0 };
 		this.bowtie.view.panX = this.panOrigin.x + dx;
 		this.bowtie.view.panY = this.panOrigin.y + dy;
@@ -1804,17 +1804,9 @@ export class BowtieView extends TextFileView {
 	private zoomAt(clientX: number, clientY: number, factor: number): void {
 		if (!this.bowtie.view) this.bowtie.view = { zoom: 1, panX: 0, panY: 0 };
 		const rect = this.containerEl_.getBoundingClientRect();
-		const mx = clientX - rect.left;
-		const my = clientY - rect.top;
-		const oldZoom = this.bowtie.view.zoom;
-		const newZoom = Math.min(3, Math.max(0.2, oldZoom * factor));
-		if (newZoom === oldZoom) return;
-
-		const worldX = (mx - this.bowtie.view.panX) / oldZoom;
-		const worldY = (my - this.bowtie.view.panY) / oldZoom;
-		this.bowtie.view.zoom = newZoom;
-		this.bowtie.view.panX = mx - worldX * newZoom;
-		this.bowtie.view.panY = my - worldY * newZoom;
+		const next = computeZoomAt(this.bowtie.view, clientX - rect.left, clientY - rect.top, factor);
+		if (!next) return;
+		this.bowtie.view = next;
 		this.applyTransform();
 		this.scheduleViewSave();
 	}
@@ -1904,18 +1896,13 @@ export class BowtieView extends TextFileView {
 		const rect = this.containerEl_.getBoundingClientRect();
 		if (rect.width === 0 || rect.height === 0) return;
 
-		const padding = 40;
-		const scaleX = (rect.width - padding * 2) / layout.bounds.width;
-		const scaleY = (rect.height - padding * 2) / layout.bounds.height;
-		const zoom = Math.min(1.2, Math.max(0.3, Math.min(scaleX, scaleY)));
-
-		const panX = (rect.width - layout.bounds.width * zoom) / 2;
-		const panY = (rect.height - layout.bounds.height * zoom) / 2;
-
-		if (!this.bowtie.view) this.bowtie.view = { zoom: 1, panX: 0, panY: 0 };
-		this.bowtie.view.zoom = zoom;
-		this.bowtie.view.panX = panX;
-		this.bowtie.view.panY = panY;
+		this.bowtie.view = computeFit(
+			layout.bounds.width,
+			layout.bounds.height,
+			rect.width,
+			rect.height,
+			40
+		);
 		this.applyTransform();
 		if (animate) this.scheduleViewSave();
 	}
@@ -2255,14 +2242,14 @@ export class BowtieView extends TextFileView {
 	private getNodeSubtitle(ref: NodeRef): string {
 		const map: Record<string, string> = {
 			hazard: "Hazard",
-			topEvent: "Top Event",
+			topEvent: "Top event",
 			threat: "Threat",
 			consequence: "Consequence",
-			preventionBarrier: "Prevention Barrier",
-			mitigationBarrier: "Mitigation Barrier",
+			preventionBarrier: "Prevention barrier",
+			mitigationBarrier: "Mitigation barrier",
 			transitionBarrier: "Barrier",
 			safeguard: "Safeguard",
-			degradationFactor: "Degradation Factor",
+			degradationFactor: "Degradation factor",
 		};
 		return map[ref.kind] ?? ref.kind;
 	}

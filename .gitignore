@@ -5,3 +5,4 @@ main.js.map
 *.log
 deploy.local.mjs
 deploy.local.ps1
+*.code-workspace

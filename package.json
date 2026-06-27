@@ -1,12 +1,15 @@
 {
 	"name": "o-tie",
-	"version": "1.0.7",
+	"version": "1.0.8",
 	"description": "Obsidian plugin for building risk bowtie diagrams",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"lint": "eslint src/",
+		"test": "vitest run",
+		"screenshots": "node scripts/render-screenshots.mjs",
+		"examples": "node scripts/generate-examples.mjs",
 		"deploy": "npm run build && node deploy.mjs",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
@@ -26,7 +29,8 @@
 		"playwright": "^1.61.0",
 		"tslib": "^2.6.2",
 		"typescript": "^5.3.3",
-		"typescript-eslint": "^8.61.1"
+		"typescript-eslint": "^8.61.1",
+		"vitest": "^4.1.9"
 	},
 	"dependencies": {
 		"html-to-image": "^1.11.13"

@@ -42,68 +42,75 @@ export class OTieSettingTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl)
-			.setName("Column gap")
-			.setDesc("Horizontal spacing between bowtie columns (pixels)")
-			.addText((text) =>
-				text
-					.setPlaceholder("120")
-					.setValue(String(this.plugin.settings.columnGap))
-					.onChange(async (value) => {
-						const parsed = parseInt(value, 10);
-						if (!isNaN(parsed) && parsed > 0) {
-							this.plugin.settings.columnGap = parsed;
-							await this.plugin.saveSettings();
-						}
-					})
-			);
+		this.addPixelSetting(
+			containerEl,
+			"Column gap",
+			"Horizontal spacing between bowtie columns (pixels)",
+			120,
+			() => this.plugin.settings.columnGap,
+			(v) => (this.plugin.settings.columnGap = v)
+		);
 
-		new Setting(containerEl)
-			.setName("Row gap")
-			.setDesc("Vertical spacing between threats/consequences (pixels)")
-			.addText((text) =>
-				text
-					.setPlaceholder("40")
-					.setValue(String(this.plugin.settings.rowGap))
-					.onChange(async (value) => {
-						const parsed = parseInt(value, 10);
-						if (!isNaN(parsed) && parsed > 0) {
-							this.plugin.settings.rowGap = parsed;
-							await this.plugin.saveSettings();
-						}
-					})
-			);
+		this.addPixelSetting(
+			containerEl,
+			"Row gap",
+			"Vertical spacing between threats/consequences (pixels)",
+			40,
+			() => this.plugin.settings.rowGap,
+			(v) => (this.plugin.settings.rowGap = v)
+		);
 
-		new Setting(containerEl)
-			.setName("Node width")
-			.setDesc("Default width of bowtie nodes (pixels)")
-			.addText((text) =>
-				text
-					.setPlaceholder("220")
-					.setValue(String(this.plugin.settings.nodeWidth))
-					.onChange(async (value) => {
-						const parsed = parseInt(value, 10);
-						if (!isNaN(parsed) && parsed > 0) {
-							this.plugin.settings.nodeWidth = parsed;
-							await this.plugin.saveSettings();
-						}
-					})
-			);
+		this.addPixelSetting(
+			containerEl,
+			"Node width",
+			"Default width of bowtie nodes (pixels)",
+			220,
+			() => this.plugin.settings.nodeWidth,
+			(v) => (this.plugin.settings.nodeWidth = v)
+		);
 
+		this.addPixelSetting(
+			containerEl,
+			"Node height",
+			"Default height of bowtie nodes (pixels)",
+			80,
+			() => this.plugin.settings.nodeHeight,
+			(v) => (this.plugin.settings.nodeHeight = v)
+		);
+	}
+
+	private addPixelSetting(
+		containerEl: HTMLElement,
+		name: string,
+		desc: string,
+		placeholder: number,
+		get: () => number,
+		set: (value: number) => void
+	): void {
 		new Setting(containerEl)
-			.setName("Node height")
-			.setDesc("Default height of bowtie nodes (pixels)")
-			.addText((text) =>
+			.setName(name)
+			.setDesc(desc)
+			.addText((text) => {
 				text
-					.setPlaceholder("80")
-					.setValue(String(this.plugin.settings.nodeHeight))
+					.setPlaceholder(String(placeholder))
+					.setValue(String(get()))
 					.onChange(async (value) => {
-						const parsed = parseInt(value, 10);
-						if (!isNaN(parsed) && parsed > 0) {
-							this.plugin.settings.nodeHeight = parsed;
-							await this.plugin.saveSettings();
+						const parsed = Number(value.trim());
+						const valid = Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0 && parsed <= 2000;
+						text.inputEl.toggleClass("o-tie-setting-invalid", !valid);
+						text.inputEl.setAttribute("aria-invalid", valid ? "false" : "true");
+						if (!valid) {
+							text.inputEl.title = "Enter a whole number of pixels between 1 and 2000";
+							return;
 						}
-					})
-			);
+						text.inputEl.title = "";
+						set(parsed);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.type = "number";
+				text.inputEl.inputMode = "numeric";
+				text.inputEl.min = "1";
+				text.inputEl.max = "2000";
+			});
 	}
 }

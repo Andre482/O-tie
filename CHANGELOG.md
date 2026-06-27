@@ -2,6 +2,25 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.8] — 2026-06-27
+
+### Added
+
+- **Pan from anywhere on touch** — Single-finger drags now pan the canvas even when the finger starts on a node; a tap still selects the node.
+- **Keyboard node selection** — Nodes are focusable (`Tab`), selectable with `Enter`/`Space`, and clearable with `Escape`.
+- **Settings validation** — Numeric layout settings reject invalid input with clear visual feedback instead of silently ignoring it.
+- **Unit tests and CI** — Vitest coverage for the model, layout, and pan/zoom logic, plus a GitHub Actions workflow running lint, type-check, tests, and build.
+
+### Fixed
+
+- **Data-loss guard** — A malformed `.bowtie` file no longer gets overwritten by an empty diagram; the original content is preserved and a notice is shown.
+
+### Changed
+
+- Internal: split the editor view into focused modules (history, pan/zoom, stack rows, external sync) and refreshed the README, examples, and contributor docs.
+
+---
+
 ## [1.0.7] — 2026-06-23
 
 ### Fixed
