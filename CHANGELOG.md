@@ -2,6 +2,14 @@
 
 All notable changes to O-Tie are documented here.
 
+## [1.0.11] — 2026-06-27
+
+### Changed
+
+- **Toolbar add buttons** — + Threat, + Consequence, + Event, and + Barrier now use the same neutral style as Fit (no green highlight on hover) and capitalised labels.
+
+---
+
 ## [1.0.10] — 2026-06-27
 
 ### Fixed

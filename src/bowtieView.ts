@@ -353,10 +353,10 @@ export class BowtieView extends TextFileView {
 		this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-separator" });
 
 		const addGroup = this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-group" });
-		this.createToolbarBtn(addGroup, "+ threat", () => this.addThreat(), { primary: true });
-		this.createToolbarBtn(addGroup, "+ consequence", () => this.addConsequence(), { primary: true });
-		this.createToolbarBtn(addGroup, "+ event", () => this.addTopEvent(), { primary: true });
-		this.createToolbarBtn(addGroup, "+ barrier", () => this.addBarrierToSelection());
+		this.createToolbarBtn(addGroup, "+ Threat", () => this.addThreat());
+		this.createToolbarBtn(addGroup, "+ Consequence", () => this.addConsequence());
+		this.createToolbarBtn(addGroup, "+ Event", () => this.addTopEvent());
+		this.createToolbarBtn(addGroup, "+ Barrier", () => this.addBarrierToSelection());
 
 		this.toolbarActionsEl.createDiv({ cls: "o-tie-toolbar-separator" });
 
