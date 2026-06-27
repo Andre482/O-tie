@@ -440,8 +440,7 @@ const WINDOWS_RESERVED_NAMES = new Set([
  */
 export function sanitizeBaseName(name: string, fallback = "bowtie"): string {
 	let result = name.replace(/[\\/:*?"<>|]/g, "-");
-	// eslint-disable-next-line no-control-regex
-	result = result.replace(/[\u0000-\u001f]/g, "");
+	result = [...result].filter((char) => char.charCodeAt(0) >= 0x20).join("");
 	result = result.replace(/^[\s.]+|[\s.]+$/g, "");
 	if (!result || result === "." || result === "..") return fallback;
 	if (WINDOWS_RESERVED_NAMES.has(result.toUpperCase())) return `_${result}`;
