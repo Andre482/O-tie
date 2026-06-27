@@ -218,7 +218,11 @@ function pageHtml(layout, barriersById) {
 	const nodes = layout.nodes.map((n) => renderNodeHtml(n, barriersById)).join("");
 	return `<!doctype html><html><head><meta charset="utf-8"><style>
 		${stylesCss}
-		html,body{margin:0;padding:0;background:#ffffff}
+		html,body{
+			margin:0;padding:0;background:#ffffff;
+			font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+			-webkit-font-smoothing:antialiased;
+		}
 		.shot-frame{
 			display:inline-block;padding:28px;
 			background-color:#ffffff;
